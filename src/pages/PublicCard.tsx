@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase';
 import { Card as CardType, Promo } from '@/types/database';
 import { CardView } from '@/components/CardView';
 import { Loader2 } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
 
 export default function PublicCard() {
   const { slug } = useParams<{ slug: string }>();
