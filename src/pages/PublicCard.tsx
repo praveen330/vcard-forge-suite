@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Card as CardType, Promo } from '@/types/database';
 import { CardView } from '@/components/CardView';
 import { Loader2 } from 'lucide-react';
+
+const RESERVED_SLUGS = ['auth', 'dashboard', 'admin', 'api', '404', 'about', 'contact', 'privacy', 'terms'];
 
 export default function PublicCard() {
   const { slug } = useParams<{ slug: string }>();
@@ -15,33 +17,42 @@ export default function PublicCard() {
 
   useEffect(() => {
     if (!slug) return;
-    loadCard();
-  }, [slug]);
-
-  const loadCard = async () => {
-    const { data, error } = await supabase.from('cards').select('*').eq('slug', slug).eq('active', true).single();
-    if (error || !data) {
+    if (RESERVED_SLUGS.includes(slug)) {
       setNotFound(true);
       setLoading(false);
       return;
     }
-    setCard(data as CardType);
+    loadCard();
+  }, [slug]);
 
-    // Load promos
-    const { data: promoData } = await supabase.from('promos').select('*').eq('card_id', data.id).eq('active', true);
-    const activePromos = (promoData as Promo[] || []).filter(p => !p.expires_at || new Date(p.expires_at) > new Date());
-    setPromos(activePromos);
+  const loadCard = async () => {
+    try {
+      const { data, error } = await supabase.from('cards').select('*').eq('slug', slug).eq('active', true).maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+      setCard(data as CardType);
 
-    setLoading(false);
+      const { data: promoData } = await supabase.from('promos').select('*').eq('card_id', data.id).eq('active', true);
+      const activePromos = (promoData as Promo[] || []).filter(p => !p.expires_at || new Date(p.expires_at) > new Date());
+      setPromos(activePromos);
+      setLoading(false);
 
-    // Log scan (fire and forget)
-    const source = searchParams.get('src') === 'qr' ? 'qr' : 'link';
-    const isMobile = /Mobi|Android|iPhone/i.test(navigator.userAgent);
-    supabase.from('scans').insert({
-      card_id: data.id,
-      source,
-      device: isMobile ? 'mobile' : 'desktop',
-    }).then(() => {});
+      // Log scan (fire and forget)
+      const source = searchParams.get('src') === 'qr' ? 'qr' : 'link';
+      const isMobile = /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+      supabase.from('scans').insert({
+        card_id: data.id,
+        source,
+        device: isMobile ? 'mobile' : 'desktop',
+      }).then(() => {});
+    } catch (err) {
+      setNotFound(true);
+      setLoading(false);
+    }
   };
 
   const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;

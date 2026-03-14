@@ -1,6 +1,18 @@
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  owner_email: string;
+  domain: string | null;
+  max_cards: number;
+  active: boolean;
+  created_at: string;
+}
+
 export interface Card {
   id: string;
   user_id: string;
+  organization_id: string | null;
   slug: string;
   full_name: string;
   job_title: string | null;
@@ -14,6 +26,7 @@ export interface Card {
   instagram: string | null;
   twitter: string | null;
   avatar_url: string | null;
+  role: string;
   active: boolean;
   created_at: string;
 }
@@ -36,5 +49,16 @@ export interface Promo {
   image_url: string | null;
   active: boolean;
   expires_at: string | null;
+  created_at: string;
+}
+
+export interface BulkImport {
+  id: string;
+  organization_id: string;
+  imported_by: string | null;
+  total_rows: number;
+  success_count: number;
+  error_count: number;
+  errors: any;
   created_at: string;
 }
