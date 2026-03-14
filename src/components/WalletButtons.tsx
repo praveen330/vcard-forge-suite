@@ -8,21 +8,21 @@ interface WalletButtonsProps {
 }
 
 function generateVCard(card: Card, publicUrl: string): string {
-  const lines = [
+  const lines: string[] = [
     'BEGIN:VCARD',
     'VERSION:3.0',
     `FN:${card.full_name}`,
   ];
   if (card.company) lines.push(`ORG:${card.company}`);
   if (card.job_title) lines.push(`TITLE:${card.job_title}`);
-  if (card.email) lines.push(`EMAIL:${card.email}`);
-  if (card.phone) lines.push(`TEL:${card.phone}`);
+  if (card.email) lines.push(`EMAIL;TYPE=WORK:${card.email}`);
+  if (card.phone) lines.push(`TEL;TYPE=CELL:${card.phone}`);
   if (card.website) lines.push(`URL:${card.website}`);
   if (card.linkedin) lines.push(`X-SOCIALPROFILE;type=linkedin:${card.linkedin}`);
   if (card.avatar_url) lines.push(`PHOTO;VALUE=uri:${card.avatar_url}`);
   lines.push(`NOTE:Digital card: ${publicUrl}`);
   lines.push('END:VCARD');
-  return lines.join('\r\n');
+  return lines.join('\r\n') + '\r\n';
 }
 
 export function CardActionButtons({ card, appUrl }: WalletButtonsProps) {
@@ -30,11 +30,13 @@ export function CardActionButtons({ card, appUrl }: WalletButtonsProps) {
 
   const handleSaveContact = () => {
     const vcf = generateVCard(card, publicUrl);
-    const blob = new Blob([vcf], { type: 'text/vcard' });
+    const blob = new Blob([vcf], { type: 'text/vcard;charset=utf-8' });
     const url = URL.createObjectURL(blob);
+    const nameParts = card.full_name.trim().split(/\s+/);
+    const filename = nameParts.join('-').toLowerCase() + '.vcf';
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${card.slug}.vcf`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,19 +15,28 @@ export default function Auth() {
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   useEffect(() => {
     if (!authLoading && user) navigate('/dashboard', { replace: true });
   }, [user, authLoading, navigate]);
 
-  const handleSendOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setInterval(() => setCooldown(c => c - 1), 1000);
+    return () => clearInterval(timer);
+  }, [cooldown]);
+
+  const handleSendOTP = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!email.trim() || !email.includes('@')) { toast.error('Please enter a valid email'); return; }
+    if (cooldown > 0) return;
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
       if (error) throw error;
       setOtpSent(true);
+      setCooldown(60);
       toast.success('Code sent! Check your email.');
     } catch (err: any) {
       toast.error(err.message || 'Failed to send code');
@@ -36,11 +45,12 @@ export default function Auth() {
     }
   };
 
-  const handleVerify = async () => {
-    if (otp.length !== 6) { toast.error('Enter the 6-digit code'); return; }
+  const handleVerify = useCallback(async (code?: string) => {
+    const token = code || otp;
+    if (token.length !== 6) { toast.error('Enter the 6-digit code'); return; }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({ email, token: otp, type: 'email' });
+      const { error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
       if (error) throw error;
       toast.success('Welcome!');
       navigate('/dashboard', { replace: true });
@@ -49,6 +59,11 @@ export default function Auth() {
     } finally {
       setLoading(false);
     }
+  }, [email, otp, navigate]);
+
+  const handleOtpChange = (value: string) => {
+    setOtp(value);
+    if (value.length === 6) handleVerify(value);
   };
 
   if (authLoading) {
@@ -84,7 +99,7 @@ export default function Auth() {
         ) : (
           <div className="space-y-4">
             <div className="flex justify-center">
-              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+              <InputOTP maxLength={6} value={otp} onChange={handleOtpChange}>
                 <InputOTPGroup>
                   {[0, 1, 2, 3, 4, 5].map(i => (
                     <InputOTPSlot key={i} index={i} className="bg-card border-border" />
@@ -92,10 +107,19 @@ export default function Auth() {
                 </InputOTPGroup>
               </InputOTP>
             </div>
-            <Button variant="gold" size="full" onClick={handleVerify} disabled={loading}>
+            <Button variant="gold" size="full" onClick={() => handleVerify()} disabled={loading || otp.length !== 6}>
               {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : 'Verify'}
             </Button>
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => { setOtpSent(false); setOtp(''); }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => handleSendOTP()}
+              disabled={cooldown > 0 || loading}
+            >
+              {cooldown > 0 ? `Resend Code (${cooldown}s)` : 'Resend Code'}
+            </Button>
+            <Button variant="ghost" size="sm" className="w-full" onClick={() => { setOtpSent(false); setOtp(''); setCooldown(0); }}>
               <ArrowLeft className="mr-1 h-4 w-4" /> Change email
             </Button>
           </div>

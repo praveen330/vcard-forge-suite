@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card } from '@/types/database';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,21 +8,29 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
 import { CardView } from '@/components/CardView';
+import { AvatarUpload } from '@/components/AvatarUpload';
 
-const RESERVED_SLUGS = ['api', 'auth', 'dashboard', 'admin', 'www', 'app'];
+const RESERVED_SLUGS = ['api', 'auth', 'dashboard', 'admin', 'www', 'app', '404', 'about', 'contact', 'privacy', 'terms'];
 
 interface CardEditorProps {
   userId: string;
   card: Card | null;
   onSave: (card: Card) => void;
+  organizationId?: string | null;
 }
 
-export function CardEditor({ userId, card, onSave }: CardEditorProps) {
+function validateWhatsApp(val: string): boolean {
+  if (!val) return true;
+  return /^\+\d{10,15}$/.test(val.replace(/\s/g, ''));
+}
+
+export function CardEditor({ userId, card, onSave, organizationId }: CardEditorProps) {
   const [form, setForm] = useState({
     full_name: '', job_title: '', company: '', bio: '', email: '',
     phone: '', whatsapp: '', website: '', linkedin: '', instagram: '',
     twitter: '', slug: '',
   });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(card?.avatar_url || null);
   const [saving, setSaving] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
@@ -37,6 +45,7 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
         linkedin: card.linkedin || '', instagram: card.instagram || '',
         twitter: card.twitter || '', slug: card.slug || '',
       });
+      setAvatarUrl(card.avatar_url || null);
     }
   }, [card]);
 
@@ -45,10 +54,12 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
   const checkSlug = useCallback(async (slug: string) => {
     if (!validateSlug(slug)) { setSlugAvailable(false); return; }
     setCheckingSlug(true);
-    const { data } = await supabase.from('cards').select('id').eq('slug', slug).neq('user_id', userId).limit(1);
+    let query = supabase.from('cards').select('id').eq('slug', slug).neq('user_id', userId).limit(1);
+    if (card?.id) query = query.neq('id', card.id);
+    const { data } = await query;
     setSlugAvailable(!data || data.length === 0);
     setCheckingSlug(false);
-  }, [userId]);
+  }, [userId, card?.id]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -68,8 +79,8 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
     if (!form.slug.trim() || !validateSlug(form.slug)) { toast.error('Please enter a valid slug (3-30 chars, lowercase, numbers, hyphens)'); return; }
     if (slugAvailable === false) { toast.error('This slug is already taken or invalid'); return; }
     if (form.phone && !form.phone.startsWith('+')) { toast.error('Phone must include country code (e.g., +1...)'); return; }
-    if (form.whatsapp && !form.whatsapp.startsWith('+')) { toast.error('WhatsApp must include country code'); return; }
-    if (form.website && form.website && !form.website.startsWith('https://')) { toast.error('Website must start with https://'); return; }
+    if (form.whatsapp && !validateWhatsApp(form.whatsapp)) { toast.error('WhatsApp format: +91XXXXXXXXXX'); return; }
+    if (form.website && !form.website.startsWith('https://')) { toast.error('Website must start with https://'); return; }
 
     setSaving(true);
     try {
@@ -87,6 +98,8 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
         linkedin: form.linkedin.trim() || null,
         instagram: form.instagram.trim() || null,
         twitter: form.twitter.trim() || null,
+        avatar_url: avatarUrl,
+        organization_id: organizationId || card?.organization_id || null,
         active: true,
       };
 
@@ -100,7 +113,7 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
         if (error) throw error;
         result = data;
       }
-      toast.success('Card saved successfully!');
+      toast.success('Card saved!');
       onSave(result as Card);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save card');
@@ -110,6 +123,7 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
   };
 
   const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+  const waValid = validateWhatsApp(form.whatsapp);
 
   const previewCard: Card = {
     id: card?.id || '', user_id: userId, slug: form.slug,
@@ -119,12 +133,12 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
     phone: form.phone || null, whatsapp: form.whatsapp || null,
     website: form.website || null, linkedin: form.linkedin || null,
     instagram: form.instagram || null, twitter: form.twitter || null,
-    avatar_url: card?.avatar_url || null, active: true, created_at: '',
+    avatar_url: avatarUrl, active: true, created_at: '',
+    organization_id: null, role: 'employee',
   };
 
   return (
     <div className="flex flex-col lg:flex-row gap-6">
-      {/* Form */}
       <div className="flex-1 space-y-4">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-lg font-semibold text-foreground">Edit Card</h2>
@@ -133,7 +147,6 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
           </Button>
         </div>
 
-        {/* Show mobile preview */}
         {showPreview && (
           <div className="lg:hidden rounded-xl border border-border overflow-hidden max-h-[60vh] overflow-y-auto">
             <CardView card={previewCard} appUrl={appUrl} />
@@ -141,6 +154,17 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
         )}
 
         <div className="grid gap-4">
+          {/* Avatar */}
+          <div className="flex justify-center">
+            <AvatarUpload
+              currentUrl={avatarUrl}
+              userId={userId}
+              userName={form.full_name}
+              onUpload={setAvatarUrl}
+              onRemove={() => setAvatarUrl(null)}
+            />
+          </div>
+
           <div>
             <Label>Username / Slug *</Label>
             <Input value={form.slug} onChange={e => handleChange('slug', e.target.value)} placeholder="john-doe" className="bg-card" />
@@ -185,7 +209,12 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
 
           <div>
             <Label>WhatsApp (with country code)</Label>
-            <Input value={form.whatsapp} onChange={e => handleChange('whatsapp', e.target.value)} placeholder="+1 555 123 4567" className="bg-card" />
+            <Input value={form.whatsapp} onChange={e => handleChange('whatsapp', e.target.value)} placeholder="+91 98765 43210" className="bg-card" />
+            {form.whatsapp && (
+              <p className={`text-xs mt-1 ${waValid ? 'text-green-500' : 'text-destructive'}`}>
+                {waValid ? '✓ Valid' : '✗ Format: +91XXXXXXXXXX'}
+              </p>
+            )}
           </div>
 
           <div>
@@ -215,7 +244,6 @@ export function CardEditor({ userId, card, onSave }: CardEditorProps) {
         </Button>
       </div>
 
-      {/* Desktop Preview */}
       <div className="hidden lg:block w-[380px] sticky top-4">
         <div className="rounded-xl border border-border overflow-hidden max-h-[85vh] overflow-y-auto">
           <CardView card={previewCard} appUrl={appUrl} />
