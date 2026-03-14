@@ -14,7 +14,233 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      bulk_imports: {
+        Row: {
+          created_at: string | null
+          error_count: number | null
+          errors: Json | null
+          id: string
+          imported_by: string | null
+          organization_id: string
+          success_count: number | null
+          total_rows: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          id?: string
+          imported_by?: string | null
+          organization_id: string
+          success_count?: number | null
+          total_rows?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          error_count?: number | null
+          errors?: Json | null
+          id?: string
+          imported_by?: string | null
+          organization_id?: string
+          success_count?: number | null
+          total_rows?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_imports_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards: {
+        Row: {
+          active: boolean | null
+          avatar_url: string | null
+          bio: string | null
+          company: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string
+          id: string
+          instagram: string | null
+          job_title: string | null
+          linkedin: string | null
+          organization_id: string | null
+          phone: string | null
+          role: string | null
+          slug: string
+          twitter: string | null
+          user_id: string
+          website: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          avatar_url?: string | null
+          bio?: string | null
+          company?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          instagram?: string | null
+          job_title?: string | null
+          linkedin?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          role?: string | null
+          slug: string
+          twitter?: string | null
+          user_id: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          avatar_url?: string | null
+          bio?: string | null
+          company?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          instagram?: string | null
+          job_title?: string | null
+          linkedin?: string | null
+          organization_id?: string | null
+          phone?: string | null
+          role?: string | null
+          slug?: string
+          twitter?: string | null
+          user_id?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          active: boolean | null
+          created_at: string | null
+          domain: string | null
+          id: string
+          max_cards: number | null
+          name: string
+          owner_email: string
+          slug: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string | null
+          domain?: string | null
+          id?: string
+          max_cards?: number | null
+          name: string
+          owner_email: string
+          slug: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string | null
+          domain?: string | null
+          id?: string
+          max_cards?: number | null
+          name?: string
+          owner_email?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      promos: {
+        Row: {
+          active: boolean | null
+          card_id: string
+          created_at: string | null
+          cta_text: string | null
+          cta_url: string | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          image_url: string | null
+          title: string
+        }
+        Insert: {
+          active?: boolean | null
+          card_id: string
+          created_at?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          image_url?: string | null
+          title: string
+        }
+        Update: {
+          active?: boolean | null
+          card_id?: string
+          created_at?: string | null
+          cta_text?: string | null
+          cta_url?: string | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          image_url?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scans: {
+        Row: {
+          card_id: string
+          created_at: string | null
+          device: string | null
+          id: string
+          source: string | null
+        }
+        Insert: {
+          card_id: string
+          created_at?: string | null
+          device?: string | null
+          id?: string
+          source?: string | null
+        }
+        Update: {
+          card_id?: string
+          created_at?: string | null
+          device?: string | null
+          id?: string
+          source?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scans_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
