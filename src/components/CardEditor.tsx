@@ -105,7 +105,7 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
 
       let result;
       if (card?.id) {
-        const { data, error } = await supabase.from('cards').update(payload).eq('id', card.id).select().single();
+        const { data, error } = await supabase.from('cards').update(payload).eq('id', card.id).eq('user_id', userId).select().single();
         if (error) throw error;
         result = data;
       } else {
