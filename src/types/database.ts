@@ -26,7 +26,21 @@ export interface Card {
   instagram: string | null;
   twitter: string | null;
   avatar_url: string | null;
+  company_logo_url: string | null;
+  theme_color: string;
+  gallery_images: string[];
   role: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface CardLink {
+  id: string;
+  card_id: string;
+  title: string;
+  url: string;
+  icon: string;
+  sort_order: number;
   active: boolean;
   created_at: string;
 }

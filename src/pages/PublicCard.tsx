@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { Card as CardType, Promo } from '@/types/database';
+import { Card as CardType, Promo, CardLink } from '@/types/database';
 import { CardView } from '@/components/CardView';
 import { Loader2 } from 'lucide-react';
 
@@ -12,6 +12,7 @@ export default function PublicCard() {
   const [searchParams] = useSearchParams();
   const [card, setCard] = useState<CardType | null>(null);
   const [promos, setPromos] = useState<Promo[]>([]);
+  const [links, setLinks] = useState<CardLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -36,9 +37,15 @@ export default function PublicCard() {
       }
       setCard(data as CardType);
 
-      const { data: promoData } = await supabase.from('promos').select('*').eq('card_id', data.id).eq('active', true);
-      const activePromos = (promoData as Promo[] || []).filter(p => !p.expires_at || new Date(p.expires_at) > new Date());
+      // Load promos + links in parallel
+      const [promosRes, linksRes] = await Promise.all([
+        supabase.from('promos').select('*').eq('card_id', data.id).eq('active', true),
+        supabase.from('card_links').select('*').eq('card_id', data.id).eq('active', true).order('sort_order'),
+      ]);
+
+      const activePromos = (promosRes.data as Promo[] || []).filter(p => !p.expires_at || new Date(p.expires_at) > new Date());
       setPromos(activePromos);
+      setLinks((linksRes.data as unknown as CardLink[]) || []);
       setLoading(false);
 
       // Log scan (fire and forget)
@@ -49,7 +56,7 @@ export default function PublicCard() {
         source,
         device: isMobile ? 'mobile' : 'desktop',
       }).then(() => {});
-    } catch (err) {
+    } catch {
       setNotFound(true);
       setLoading(false);
     }
@@ -82,7 +89,7 @@ export default function PublicCard() {
       <meta property="og:description" content={ogDesc || 'Digital Business Card'} />
       {card.avatar_url && <meta property="og:image" content={card.avatar_url} />}
       <meta property="og:type" content="profile" />
-      <CardView card={card} promos={promos} appUrl={appUrl} />
+      <CardView card={card} promos={promos} links={links} appUrl={appUrl} />
     </>
   );
 }
