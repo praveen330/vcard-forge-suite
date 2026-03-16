@@ -246,7 +246,7 @@ export default function Admin() {
 
     for (const row of valid) {
       const { error } = await supabase.from('cards').insert({
-        user_id: null, // employee claims on login
+        user_id: user!.id,
         organization_id: bulkOrg,
         full_name: row.full_name,
         slug: row.slug,
