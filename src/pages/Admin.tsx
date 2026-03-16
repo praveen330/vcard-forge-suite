@@ -127,7 +127,7 @@ export default function Admin() {
     try {
       const { error } = await supabase.from('cards').insert({
         // user_id left null — employee will claim it on first login
-        user_id: null,
+        user_id: user!.id,
         full_name: cardForm.full_name.trim(),
         slug: cardForm.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
         job_title: cardForm.job_title.trim() || null,
@@ -246,7 +246,7 @@ export default function Admin() {
 
     for (const row of valid) {
       const { error } = await supabase.from('cards').insert({
-        user_id: null, // employee claims on login
+        user_id: user!.id,
         organization_id: bulkOrg,
         full_name: row.full_name,
         slug: row.slug,

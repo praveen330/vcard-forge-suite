@@ -225,7 +225,7 @@ export default function Dashboard() {
 
                     {/* QR Code */}
                     <div className="glass-card rounded-xl p-5 flex flex-col items-center gap-4">
-                      <QRDisplay url={cardUrl + '?src=qr'} size={200} slug={card.slug} />
+                      <QRDisplay url={cardUrl + '?src=qr'} size={200} />
                     </div>
 
                     {/* Card URL */}
