@@ -9,17 +9,21 @@ export function useAuth() {
   const [pendingOrgId, setPendingOrgId] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    let mounted = true;
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
 
-      if (_event === 'SIGNED_IN' && session?.user) {
-        // Check org auto-assign
+      if (_event === 'SIGNED_IN' && session?.user?.email) {
         const email = session.user.email;
-        if (email) {
-          const domain = email.split('@')[1];
-          if (domain) {
+        const domain = email.split('@')[1];
+        if (!domain) return;
+
+        void (async () => {
+          try {
             const { data: org } = await supabase
               .from('organizations')
               .select('id')
@@ -27,19 +31,40 @@ export function useAuth() {
               .eq('active', true)
               .limit(1)
               .maybeSingle();
-            if (org) setPendingOrgId(org.id);
+
+            if (!mounted) return;
+            setPendingOrgId(org?.id ?? null);
+          } catch (error) {
+            console.error('Org auto-assign check failed:', error);
           }
-        }
+        })();
+      } else {
+        setPendingOrgId(null);
       }
     });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    void (async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (!mounted) return;
 
-    return () => subscription.unsubscribe();
+        setSession(data.session);
+        setUser(data.session?.user ?? null);
+      } catch (error) {
+        console.error('Failed to restore auth session:', error);
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
