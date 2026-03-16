@@ -1,14 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Card } from '@/types/database';
+import { Card, CardLink } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Loader2, Save, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Save, Eye, EyeOff, Upload } from 'lucide-react';
 import { CardView } from '@/components/CardView';
 import { AvatarUpload } from '@/components/AvatarUpload';
+import { LinksManager } from '@/components/LinksManager';
+import { GalleryManager } from '@/components/GalleryManager';
+import { ThemePicker } from '@/components/ThemePicker';
 
 const RESERVED_SLUGS = ['api', 'auth', 'dashboard', 'admin', 'www', 'app', '404', 'about', 'contact', 'privacy', 'terms'];
 
@@ -31,10 +34,15 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     twitter: '', slug: '',
   });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(card?.avatar_url || null);
+  const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(card?.company_logo_url || null);
+  const [themeColor, setThemeColor] = useState(card?.theme_color || 'dark');
+  const [galleryImages, setGalleryImages] = useState<string[]>(card?.gallery_images || []);
+  const [cardLinks, setCardLinks] = useState<CardLink[]>([]);
   const [saving, setSaving] = useState(false);
   const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
   const [checkingSlug, setCheckingSlug] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (card) {
@@ -46,8 +54,21 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
         twitter: card.twitter || '', slug: card.slug || '',
       });
       setAvatarUrl(card.avatar_url || null);
+      setCompanyLogoUrl(card.company_logo_url || null);
+      setThemeColor(card.theme_color || 'dark');
+      setGalleryImages(card.gallery_images || []);
+      loadLinks(card.id);
     }
   }, [card]);
+
+  const loadLinks = async (cardId: string) => {
+    const { data } = await supabase
+      .from('card_links')
+      .select('*')
+      .eq('card_id', cardId)
+      .order('sort_order');
+    setCardLinks((data as unknown as CardLink[]) || []);
+  };
 
   const validateSlug = (slug: string) => /^[a-z0-9-]{3,30}$/.test(slug) && !RESERVED_SLUGS.includes(slug);
 
@@ -72,6 +93,28 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     if (field === 'slug') value = value.toLowerCase().replace(/[^a-z0-9-]/g, '');
     if (field === 'bio') value = value.slice(0, 280);
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const path = `${userId}/logo.${file.name.split('.').pop() || 'png'}`;
+      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+        upsert: true,
+        contentType: file.type,
+      });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+      const url = urlData.publicUrl + '?t=' + Date.now();
+      setCompanyLogoUrl(url);
+      toast.success('Logo uploaded!');
+    } catch (err: any) {
+      toast.error(err.message || 'Logo upload failed');
+    } finally {
+      setUploadingLogo(false);
+    }
   };
 
   const handleSave = async () => {
@@ -99,6 +142,9 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
         instagram: form.instagram.trim() || null,
         twitter: form.twitter.trim() || null,
         avatar_url: avatarUrl,
+        company_logo_url: companyLogoUrl,
+        theme_color: themeColor,
+        gallery_images: galleryImages,
         organization_id: organizationId || card?.organization_id || null,
         active: true,
       };
@@ -133,8 +179,9 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     phone: form.phone || null, whatsapp: form.whatsapp || null,
     website: form.website || null, linkedin: form.linkedin || null,
     instagram: form.instagram || null, twitter: form.twitter || null,
-    avatar_url: avatarUrl, active: true, created_at: '',
-    organization_id: null, role: 'employee',
+    avatar_url: avatarUrl, company_logo_url: companyLogoUrl,
+    theme_color: themeColor, gallery_images: galleryImages,
+    active: true, created_at: '', organization_id: null, role: 'employee',
   };
 
   return (
@@ -149,7 +196,7 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
 
         {showPreview && (
           <div className="lg:hidden rounded-xl border border-border overflow-hidden max-h-[60vh] overflow-y-auto">
-            <CardView card={previewCard} appUrl={appUrl} />
+            <CardView card={previewCard} links={cardLinks} appUrl={appUrl} />
           </div>
         )}
 
@@ -163,6 +210,30 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
               onUpload={setAvatarUrl}
               onRemove={() => setAvatarUrl(null)}
             />
+          </div>
+
+          {/* Company Logo */}
+          <div>
+            <Label className="text-sm font-semibold">Company Logo</Label>
+            <div className="flex items-center gap-3 mt-1">
+              {companyLogoUrl ? (
+                <div className="relative group">
+                  <img src={companyLogoUrl} alt="Logo" className="h-12 w-auto rounded-lg border border-border object-contain bg-card p-1" />
+                  <button
+                    onClick={() => setCompanyLogoUrl(null)}
+                    className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full w-4 h-4 flex items-center justify-center text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : (
+                <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary/50 cursor-pointer transition-colors">
+                  {uploadingLogo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 text-muted-foreground" />}
+                  <span className="text-sm text-muted-foreground">Upload Logo</span>
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </label>
+              )}
+            </div>
           </div>
 
           <div>
@@ -237,6 +308,37 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
             <Label>Twitter / X</Label>
             <Input value={form.twitter} onChange={e => handleChange('twitter', e.target.value)} placeholder="johndoe" className="bg-card" />
           </div>
+
+          {/* Divider */}
+          <hr className="border-border" />
+
+          {/* Theme Picker */}
+          <ThemePicker value={themeColor} onChange={setThemeColor} />
+
+          {/* Links Manager — only if card is saved */}
+          {card?.id && (
+            <>
+              <hr className="border-border" />
+              <LinksManager cardId={card.id} links={cardLinks} onUpdate={setCardLinks} />
+            </>
+          )}
+
+          {/* Gallery — only if card is saved */}
+          {card?.id && (
+            <>
+              <hr className="border-border" />
+              <GalleryManager
+                images={galleryImages}
+                userId={userId}
+                cardId={card.id}
+                onChange={setGalleryImages}
+              />
+            </>
+          )}
+
+          {!card?.id && (
+            <p className="text-xs text-muted-foreground italic">Save your card first to add links and gallery images.</p>
+          )}
         </div>
 
         <Button variant="gold" size="full" onClick={handleSave} disabled={saving}>
@@ -246,7 +348,7 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
 
       <div className="hidden lg:block w-[380px] sticky top-4">
         <div className="rounded-xl border border-border overflow-hidden max-h-[85vh] overflow-y-auto">
-          <CardView card={previewCard} appUrl={appUrl} />
+          <CardView card={previewCard} links={cardLinks} appUrl={appUrl} />
         </div>
       </div>
     </div>
