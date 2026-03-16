@@ -55,15 +55,58 @@ export type Database = {
           },
         ]
       }
+      card_links: {
+        Row: {
+          active: boolean | null
+          card_id: string
+          created_at: string | null
+          icon: string | null
+          id: string
+          sort_order: number | null
+          title: string
+          url: string
+        }
+        Insert: {
+          active?: boolean | null
+          card_id: string
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          sort_order?: number | null
+          title: string
+          url: string
+        }
+        Update: {
+          active?: boolean | null
+          card_id?: string
+          created_at?: string | null
+          icon?: string | null
+          id?: string
+          sort_order?: number | null
+          title?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_links_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cards: {
         Row: {
           active: boolean | null
           avatar_url: string | null
           bio: string | null
           company: string | null
+          company_logo_url: string | null
           created_at: string | null
           email: string | null
           full_name: string
+          gallery_images: Json | null
           id: string
           instagram: string | null
           job_title: string | null
@@ -72,6 +115,7 @@ export type Database = {
           phone: string | null
           role: string | null
           slug: string
+          theme_color: string | null
           twitter: string | null
           user_id: string
           website: string | null
@@ -82,9 +126,11 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           company?: string | null
+          company_logo_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name: string
+          gallery_images?: Json | null
           id?: string
           instagram?: string | null
           job_title?: string | null
@@ -93,6 +139,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           slug: string
+          theme_color?: string | null
           twitter?: string | null
           user_id: string
           website?: string | null
@@ -103,9 +150,11 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           company?: string | null
+          company_logo_url?: string | null
           created_at?: string | null
           email?: string | null
           full_name?: string
+          gallery_images?: Json | null
           id?: string
           instagram?: string | null
           job_title?: string | null
@@ -114,6 +163,7 @@ export type Database = {
           phone?: string | null
           role?: string | null
           slug?: string
+          theme_color?: string | null
           twitter?: string | null
           user_id?: string
           website?: string | null
