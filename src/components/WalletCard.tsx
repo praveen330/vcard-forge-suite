@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { Card as CardType } from '@/types/database';
 import { Button } from '@/components/ui/button';
-import { Download, Wallet, QrCode } from 'lucide-react';
+import { Download, Wallet, Smartphone } from 'lucide-react';
 import { getTheme } from '@/components/ThemePicker';
 import QRCode from 'qrcode';
 
@@ -16,7 +16,6 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
   const theme = getTheme(card.theme_color || 'dark');
 
   const downloadAsImage = async () => {
-    // Dynamic import html2canvas
     const { default: html2canvas } = await import('html2canvas');
     if (!cardRef.current) return;
     const canvas = await html2canvas(cardRef.current, {
@@ -30,6 +29,18 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
     link.click();
   };
 
+  const addToAppleWallet = () => {
+    // Apple Wallet requires .pkpass files which need a server-side signing.
+    // For now, download as image which users can add to Photos/Wallet manually.
+    downloadAsImage();
+  };
+
+  const addToGPayPhonePe = () => {
+    // GPay/PhonePe don't have a public pass API for free.
+    // Save as image — users can set it as a widget or save to gallery.
+    downloadAsImage();
+  };
+
   return (
     <div className="space-y-4">
       {/* Wallet-style business card */}
@@ -40,7 +51,7 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
           background: theme.gradient || theme.bg,
           color: theme.text,
           maxWidth: '400px',
-          aspectRatio: '1.586 / 1', // Standard credit card ratio
+          aspectRatio: '1.586 / 1',
         }}
       >
         {/* Top bar */}
@@ -51,9 +62,9 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2">
               {card.company_logo_url ? (
-                <img src={card.company_logo_url} alt="" className="h-8 w-auto object-contain rounded" />
+                <img src={card.company_logo_url} alt="" className="h-12 w-auto max-w-[120px] object-contain rounded" />
               ) : card.company ? (
-                <div className="text-xs font-bold opacity-70 uppercase tracking-wider">{card.company}</div>
+                <div className="text-sm font-bold opacity-80 uppercase tracking-wider">{card.company}</div>
               ) : null}
             </div>
             <div className="bg-white rounded-md p-1">
@@ -61,7 +72,7 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
                 ref={(canvas) => {
                   if (canvas) {
                     QRCode.toCanvas(canvas, publicUrl, {
-                      width: 56,
+                      width: 60,
                       margin: 0,
                       color: { dark: '#000000', light: '#FFFFFF' },
                     });
@@ -82,6 +93,9 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
                 {card.job_title}
               </p>
             )}
+            {card.company && (
+              <p className="text-xs opacity-60 mt-0.5">{card.company}</p>
+            )}
           </div>
 
           {/* Bottom row: contact details */}
@@ -99,11 +113,19 @@ export function WalletCard({ card, appUrl }: WalletCardProps) {
         </div>
       </div>
 
-      {/* Download button */}
-      <div className="flex justify-center gap-2">
-        <Button variant="gold" size="sm" onClick={downloadAsImage}>
-          <Download className="mr-1 h-4 w-4" /> Save Wallet Card
+      {/* Wallet save buttons */}
+      <div className="flex flex-col gap-2">
+        <Button variant="gold" size="sm" className="w-full" onClick={downloadAsImage}>
+          <Download className="mr-1.5 h-4 w-4" /> Save Wallet Card
         </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="outline" size="sm" onClick={addToAppleWallet} className="text-xs">
+            <Smartphone className="mr-1 h-3.5 w-3.5" /> Apple Wallet
+          </Button>
+          <Button variant="outline" size="sm" onClick={addToGPayPhonePe} className="text-xs">
+            <Wallet className="mr-1 h-3.5 w-3.5" /> GPay / PhonePe
+          </Button>
+        </div>
       </div>
     </div>
   );

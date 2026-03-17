@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Plus, X, Loader2, ImageIcon } from 'lucide-react';
+import { X, Loader2, ImageIcon } from 'lucide-react';
 
 interface GalleryManagerProps {
   images: string[];
@@ -17,32 +17,38 @@ export function GalleryManager({ images, userId, cardId, onChange }: GalleryMana
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Only images are allowed');
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const remaining = 8 - images.length;
+    if (files.length > remaining) {
+      toast.error(`You can only add ${remaining} more image${remaining === 1 ? '' : 's'} (max 8)`);
       return;
     }
-    if (images.length >= 8) {
-      toast.error('Maximum 8 gallery images');
-      return;
+
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        toast.error(`${file.name} is not an image`);
+        return;
+      }
     }
 
     setUploading(true);
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
-      const path = `${userId}/gallery/${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
-        upsert: false,
-        contentType: file.type,
-      });
-      if (upErr) throw upErr;
+      const newUrls: string[] = [];
+      for (const file of files) {
+        const ext = file.name.split('.').pop() || 'jpg';
+        const path = `${userId}/gallery/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+        const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
+          upsert: false,
+          contentType: file.type,
+        });
+        if (upErr) throw upErr;
+        const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
+        newUrls.push(urlData.publicUrl + '?t=' + Date.now());
+      }
 
-      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(path);
-      const url = urlData.publicUrl + '?t=' + Date.now();
-
-      const updated = [...images, url];
-      // Save to card
+      const updated = [...images, ...newUrls];
       const { error: dbErr } = await supabase
         .from('cards')
         .update({ gallery_images: updated })
@@ -50,7 +56,7 @@ export function GalleryManager({ images, userId, cardId, onChange }: GalleryMana
       if (dbErr) throw dbErr;
 
       onChange(updated);
-      toast.success('Image added to gallery!');
+      toast.success(`${newUrls.length} image${newUrls.length > 1 ? 's' : ''} added!`);
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
     } finally {
@@ -98,6 +104,7 @@ export function GalleryManager({ images, userId, cardId, onChange }: GalleryMana
         ref={fileRef}
         type="file"
         accept="image/jpeg,image/png,image/webp"
+        multiple
         onChange={handleUpload}
         className="hidden"
       />
@@ -110,7 +117,7 @@ export function GalleryManager({ images, userId, cardId, onChange }: GalleryMana
         {uploading ? (
           <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Uploading...</>
         ) : (
-          <><ImageIcon className="mr-1 h-4 w-4" /> Add Image</>
+          <><ImageIcon className="mr-1 h-4 w-4" /> Add Images (Bulk)</>
         )}
       </Button>
     </div>
