@@ -5,7 +5,7 @@ import { Card as CardType, Promo, CardLink } from '@/types/database';
 import { CardView } from '@/components/CardView';
 import { Loader2 } from 'lucide-react';
 
-const RESERVED_SLUGS = ['auth', 'dashboard', 'admin', 'api', '404', 'about', 'contact', 'privacy', 'terms'];
+const RESERVED_SLUGS = ['auth', 'dashboard', 'admin', 'api', '404', 'about', 'contact', 'privacy', 'terms', 'pricing'];
 
 export default function PublicCard() {
   const { slug } = useParams<{ slug: string }>();

@@ -43,7 +43,7 @@ export function ThemePicker({ value, onChange }: ThemePickerProps) {
   return (
     <div className="space-y-2">
       <Label className="text-sm font-semibold">Card Theme</Label>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {CARD_THEMES.map((theme) => (
           <button
             key={theme.key}
