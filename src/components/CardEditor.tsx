@@ -100,7 +100,9 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     if (!file) return;
     setUploadingLogo(true);
     try {
-      const path = `${userId}/logo.${file.name.split('.').pop() || 'png'}`;
+      const cardId = card?.id || crypto.randomUUID();
+      const ext = file.name.split('.').pop() || 'png';
+      const path = `${userId}/logo-${cardId}.${ext}`;
       const { error: upErr } = await supabase.storage.from('avatars').upload(path, file, {
         upsert: true,
         contentType: file.type,

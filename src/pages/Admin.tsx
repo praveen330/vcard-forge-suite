@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, Trash2, Plus, BarChart3,
-  Building2, CreditCard, Megaphone, Upload, Download, ExternalLink,
+  Building2, CreditCard, Megaphone, Upload, Download, ExternalLink, Edit, X,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'gpk330@gmail.com';
@@ -116,18 +116,37 @@ export default function Admin() {
     } catch (err: any) { toast.error(err.message); }
   };
 
-  // ─── ADD CARD FORM ───────────────────────────────────────────
+  // ─── ADD/EDIT CARD FORM ───────────────────────────────────────────
   const [cardForm, setCardForm] = useState({
     full_name: '', slug: '', job_title: '', company: '',
-    email: '', phone: '', whatsapp: '', organization_id: '',
+    email: '', phone: '', whatsapp: '', organization_id: '', bio: '',
+    linkedin: '', instagram: '', twitter: '', website: '',
   });
+  const [editingCard, setEditingCard] = useState<string | null>(null);
+
+  const startEditCard = (c: CardType) => {
+    setEditingCard(c.id);
+    setCardForm({
+      full_name: c.full_name || '', slug: c.slug || '',
+      job_title: c.job_title || '', company: c.company || '',
+      email: c.email || '', phone: c.phone || '',
+      whatsapp: c.whatsapp || '', organization_id: c.organization_id || '',
+      bio: c.bio || '', linkedin: c.linkedin || '',
+      instagram: c.instagram || '', twitter: c.twitter || '',
+      website: c.website || '',
+    });
+    setTab('cards');
+  };
+
+  const cancelEditCard = () => {
+    setEditingCard(null);
+    setCardForm({ full_name: '', slug: '', job_title: '', company: '', email: '', phone: '', whatsapp: '', organization_id: '', bio: '', linkedin: '', instagram: '', twitter: '', website: '' });
+  };
 
   const addCard = async () => {
     if (!cardForm.full_name || !cardForm.slug) { toast.error('Name and slug required'); return; }
     try {
-      const { error } = await supabase.from('cards').insert({
-        // user_id left null — employee will claim it on first login
-        user_id: user!.id,
+      const payload: any = {
         full_name: cardForm.full_name.trim(),
         slug: cardForm.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
         job_title: cardForm.job_title.trim() || null,
@@ -135,12 +154,26 @@ export default function Admin() {
         email: cardForm.email.trim() || null,
         phone: cardForm.phone.trim() || null,
         whatsapp: cardForm.whatsapp.trim() || null,
+        bio: cardForm.bio.trim() || null,
+        linkedin: cardForm.linkedin.trim() || null,
+        instagram: cardForm.instagram.trim() || null,
+        twitter: cardForm.twitter.trim() || null,
+        website: cardForm.website.trim() || null,
         organization_id: cardForm.organization_id || null,
         active: true,
-      });
-      if (error) throw error;
-      toast.success('Card created — employee can claim it by logging in with their email');
-      setCardForm({ full_name: '', slug: '', job_title: '', company: '', email: '', phone: '', whatsapp: '', organization_id: '' });
+      };
+
+      if (editingCard) {
+        const { error } = await supabase.from('cards').update(payload).eq('id', editingCard);
+        if (error) throw error;
+        toast.success('Card updated!');
+      } else {
+        payload.user_id = user!.id;
+        const { error } = await supabase.from('cards').insert(payload);
+        if (error) throw error;
+        toast.success('Card created — employee can claim it by logging in with their email');
+      }
+      cancelEditCard();
       loadData();
     } catch (err: any) { toast.error(err.message); }
   };
@@ -487,8 +520,15 @@ export default function Admin() {
         {tab === 'cards' && (
           <div className="space-y-6">
             <div className="glass-card rounded-xl p-4 space-y-3">
-              <h3 className="font-semibold text-foreground">Add Single Card</h3>
-              <p className="text-xs text-muted-foreground">Leave user_id empty — employee claims the card by logging in with their email.</p>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">{editingCard ? 'Edit Card' : 'Add Single Card'}</h3>
+                {editingCard && (
+                  <Button variant="ghost" size="sm" onClick={cancelEditCard}>
+                    <X className="mr-1 h-4 w-4" /> Cancel
+                  </Button>
+                )}
+              </div>
+              {!editingCard && <p className="text-xs text-muted-foreground">Leave user_id empty — employee claims the card by logging in with their email.</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Full Name *</Label>
@@ -497,7 +537,7 @@ export default function Admin() {
                     onChange={e => setCardForm(f => ({
                       ...f,
                       full_name: e.target.value,
-                      slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
+                      slug: editingCard ? f.slug : e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
                     }))}
                     className="bg-card"
                   />
@@ -509,6 +549,12 @@ export default function Admin() {
                 <div><Label>Job Title</Label><Input value={cardForm.job_title} onChange={e => setCardForm(f => ({ ...f, job_title: e.target.value }))} className="bg-card" /></div>
                 <div><Label>Company</Label><Input value={cardForm.company} onChange={e => setCardForm(f => ({ ...f, company: e.target.value }))} className="bg-card" /></div>
                 <div><Label>Email</Label><Input type="email" value={cardForm.email} onChange={e => setCardForm(f => ({ ...f, email: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Phone</Label><Input value={cardForm.phone} onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))} className="bg-card" /></div>
+                <div><Label>WhatsApp</Label><Input value={cardForm.whatsapp} onChange={e => setCardForm(f => ({ ...f, whatsapp: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Website</Label><Input value={cardForm.website} onChange={e => setCardForm(f => ({ ...f, website: e.target.value }))} className="bg-card" /></div>
+                <div><Label>LinkedIn</Label><Input value={cardForm.linkedin} onChange={e => setCardForm(f => ({ ...f, linkedin: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Instagram</Label><Input value={cardForm.instagram} onChange={e => setCardForm(f => ({ ...f, instagram: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Twitter/X</Label><Input value={cardForm.twitter} onChange={e => setCardForm(f => ({ ...f, twitter: e.target.value }))} className="bg-card" /></div>
                 <div>
                   <Label>Organization</Label>
                   <select className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
@@ -518,7 +564,13 @@ export default function Admin() {
                   </select>
                 </div>
               </div>
-              <Button variant="gold" onClick={addCard}><Plus className="mr-1 h-4 w-4" /> Create Card</Button>
+              <div>
+                <Label>Bio</Label>
+                <Textarea value={cardForm.bio} onChange={e => setCardForm(f => ({ ...f, bio: e.target.value }))} className="bg-card" rows={2} />
+              </div>
+              <Button variant="gold" onClick={addCard}>
+                <Plus className="mr-1 h-4 w-4" /> {editingCard ? 'Update Card' : 'Create Card'}
+              </Button>
             </div>
 
             <div>
@@ -555,6 +607,9 @@ export default function Admin() {
                           <a href={`/${c.slug}`} target="_blank" rel="noreferrer">
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                           </a>
+                          <Button variant="ghost" size="icon" onClick={() => startEditCard(c)} title="Edit card">
+                            <Edit className="h-4 w-4 text-primary" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => deleteCard(c.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
