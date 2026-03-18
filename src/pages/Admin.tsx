@@ -607,6 +607,9 @@ export default function Admin() {
                           <a href={`/${c.slug}`} target="_blank" rel="noreferrer">
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                           </a>
+                          <Button variant="ghost" size="icon" onClick={() => startEditCard(c)} title="Edit card">
+                            <Edit className="h-4 w-4 text-primary" />
+                          </Button>
                           <Button variant="ghost" size="icon" onClick={() => deleteCard(c.id)}>
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
