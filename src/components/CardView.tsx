@@ -43,7 +43,7 @@ const BRAND_COLORS: Record<string, { bg: string; text: string }> = {
 export function CardView({ card, promos = [], links = [], appUrl }: CardViewProps) {
   const publicUrl = `${appUrl}/${card.slug}`;
   const theme = getTheme(card.theme_color || 'dark');
-  const isLight = ['white', 'coral', 'icici', 'pearl', 'mint', 'lavender', 'sky', 'sand', 'rose'].includes(card.theme_color);
+  const isLight = ['white', 'coral', 'icici', 'pearl', 'mint', 'lavender', 'sky', 'sand', 'rose', 'slate', 'cream', 'arctic', 'blush', 'ivory', 'silver'].includes(card.theme_color);
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   const handleSaveContact = () => {
