@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, Trash2, Plus, BarChart3,
-  Building2, CreditCard, Megaphone, Upload, Download, ExternalLink,
+  Building2, CreditCard, Megaphone, Upload, Download, ExternalLink, Edit, X,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'gpk330@gmail.com';
