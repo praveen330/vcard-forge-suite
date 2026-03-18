@@ -21,9 +21,14 @@ export default function Landing() {
         <h2 className="text-xl font-display font-bold">
           <span className="gold-text">VCARD</span><span className="text-foreground">·OS</span>
         </h2>
-        <Button variant="gold" size="sm" onClick={() => navigate(user ? '/dashboard' : '/auth')}>
-          {user ? 'Dashboard' : 'Get Started'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/pricing')}>
+            Pricing
+          </Button>
+          <Button variant="gold" size="sm" onClick={() => navigate(user ? '/dashboard' : '/auth')}>
+            {user ? 'Dashboard' : 'Get Started'}
+          </Button>
+        </div>
       </nav>
 
       {/* Hero */}
