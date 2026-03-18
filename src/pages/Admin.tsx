@@ -116,18 +116,37 @@ export default function Admin() {
     } catch (err: any) { toast.error(err.message); }
   };
 
-  // ─── ADD CARD FORM ───────────────────────────────────────────
+  // ─── ADD/EDIT CARD FORM ───────────────────────────────────────────
   const [cardForm, setCardForm] = useState({
     full_name: '', slug: '', job_title: '', company: '',
-    email: '', phone: '', whatsapp: '', organization_id: '',
+    email: '', phone: '', whatsapp: '', organization_id: '', bio: '',
+    linkedin: '', instagram: '', twitter: '', website: '',
   });
+  const [editingCard, setEditingCard] = useState<string | null>(null);
+
+  const startEditCard = (c: CardType) => {
+    setEditingCard(c.id);
+    setCardForm({
+      full_name: c.full_name || '', slug: c.slug || '',
+      job_title: c.job_title || '', company: c.company || '',
+      email: c.email || '', phone: c.phone || '',
+      whatsapp: c.whatsapp || '', organization_id: c.organization_id || '',
+      bio: c.bio || '', linkedin: c.linkedin || '',
+      instagram: c.instagram || '', twitter: c.twitter || '',
+      website: c.website || '',
+    });
+    setTab('cards');
+  };
+
+  const cancelEditCard = () => {
+    setEditingCard(null);
+    setCardForm({ full_name: '', slug: '', job_title: '', company: '', email: '', phone: '', whatsapp: '', organization_id: '', bio: '', linkedin: '', instagram: '', twitter: '', website: '' });
+  };
 
   const addCard = async () => {
     if (!cardForm.full_name || !cardForm.slug) { toast.error('Name and slug required'); return; }
     try {
-      const { error } = await supabase.from('cards').insert({
-        // user_id left null — employee will claim it on first login
-        user_id: user!.id,
+      const payload: any = {
         full_name: cardForm.full_name.trim(),
         slug: cardForm.slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, ''),
         job_title: cardForm.job_title.trim() || null,
@@ -135,12 +154,26 @@ export default function Admin() {
         email: cardForm.email.trim() || null,
         phone: cardForm.phone.trim() || null,
         whatsapp: cardForm.whatsapp.trim() || null,
+        bio: cardForm.bio.trim() || null,
+        linkedin: cardForm.linkedin.trim() || null,
+        instagram: cardForm.instagram.trim() || null,
+        twitter: cardForm.twitter.trim() || null,
+        website: cardForm.website.trim() || null,
         organization_id: cardForm.organization_id || null,
         active: true,
-      });
-      if (error) throw error;
-      toast.success('Card created — employee can claim it by logging in with their email');
-      setCardForm({ full_name: '', slug: '', job_title: '', company: '', email: '', phone: '', whatsapp: '', organization_id: '' });
+      };
+
+      if (editingCard) {
+        const { error } = await supabase.from('cards').update(payload).eq('id', editingCard);
+        if (error) throw error;
+        toast.success('Card updated!');
+      } else {
+        payload.user_id = user!.id;
+        const { error } = await supabase.from('cards').insert(payload);
+        if (error) throw error;
+        toast.success('Card created — employee can claim it by logging in with their email');
+      }
+      cancelEditCard();
       loadData();
     } catch (err: any) { toast.error(err.message); }
   };
