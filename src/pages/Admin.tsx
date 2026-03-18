@@ -520,8 +520,15 @@ export default function Admin() {
         {tab === 'cards' && (
           <div className="space-y-6">
             <div className="glass-card rounded-xl p-4 space-y-3">
-              <h3 className="font-semibold text-foreground">Add Single Card</h3>
-              <p className="text-xs text-muted-foreground">Leave user_id empty — employee claims the card by logging in with their email.</p>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">{editingCard ? 'Edit Card' : 'Add Single Card'}</h3>
+                {editingCard && (
+                  <Button variant="ghost" size="sm" onClick={cancelEditCard}>
+                    <X className="mr-1 h-4 w-4" /> Cancel
+                  </Button>
+                )}
+              </div>
+              {!editingCard && <p className="text-xs text-muted-foreground">Leave user_id empty — employee claims the card by logging in with their email.</p>}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <Label>Full Name *</Label>
@@ -530,7 +537,7 @@ export default function Admin() {
                     onChange={e => setCardForm(f => ({
                       ...f,
                       full_name: e.target.value,
-                      slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
+                      slug: editingCard ? f.slug : e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
                     }))}
                     className="bg-card"
                   />
@@ -542,6 +549,12 @@ export default function Admin() {
                 <div><Label>Job Title</Label><Input value={cardForm.job_title} onChange={e => setCardForm(f => ({ ...f, job_title: e.target.value }))} className="bg-card" /></div>
                 <div><Label>Company</Label><Input value={cardForm.company} onChange={e => setCardForm(f => ({ ...f, company: e.target.value }))} className="bg-card" /></div>
                 <div><Label>Email</Label><Input type="email" value={cardForm.email} onChange={e => setCardForm(f => ({ ...f, email: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Phone</Label><Input value={cardForm.phone} onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))} className="bg-card" /></div>
+                <div><Label>WhatsApp</Label><Input value={cardForm.whatsapp} onChange={e => setCardForm(f => ({ ...f, whatsapp: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Website</Label><Input value={cardForm.website} onChange={e => setCardForm(f => ({ ...f, website: e.target.value }))} className="bg-card" /></div>
+                <div><Label>LinkedIn</Label><Input value={cardForm.linkedin} onChange={e => setCardForm(f => ({ ...f, linkedin: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Instagram</Label><Input value={cardForm.instagram} onChange={e => setCardForm(f => ({ ...f, instagram: e.target.value }))} className="bg-card" /></div>
+                <div><Label>Twitter/X</Label><Input value={cardForm.twitter} onChange={e => setCardForm(f => ({ ...f, twitter: e.target.value }))} className="bg-card" /></div>
                 <div>
                   <Label>Organization</Label>
                   <select className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
@@ -551,7 +564,13 @@ export default function Admin() {
                   </select>
                 </div>
               </div>
-              <Button variant="gold" onClick={addCard}><Plus className="mr-1 h-4 w-4" /> Create Card</Button>
+              <div>
+                <Label>Bio</Label>
+                <Textarea value={cardForm.bio} onChange={e => setCardForm(f => ({ ...f, bio: e.target.value }))} className="bg-card" rows={2} />
+              </div>
+              <Button variant="gold" onClick={addCard}>
+                <Plus className="mr-1 h-4 w-4" /> {editingCard ? 'Update Card' : 'Create Card'}
+              </Button>
             </div>
 
             <div>
