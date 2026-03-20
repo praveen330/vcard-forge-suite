@@ -36,6 +36,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
   const [avatarUrl, setAvatarUrl] = useState<string | null>(card?.avatar_url || null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(card?.company_logo_url || null);
   const [themeColor, setThemeColor] = useState(card?.theme_color || 'dark');
+  const [primaryColor, setPrimaryColor] = useState<string | null>(card?.primary_color || null);
+  const [secondaryColor, setSecondaryColor] = useState<string | null>(card?.secondary_color || null);
   const [galleryImages, setGalleryImages] = useState<string[]>(card?.gallery_images || []);
   const [cardLinks, setCardLinks] = useState<CardLink[]>([]);
   const [saving, setSaving] = useState(false);
