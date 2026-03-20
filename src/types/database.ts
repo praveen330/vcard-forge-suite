@@ -28,6 +28,8 @@ export interface Card {
   avatar_url: string | null;
   company_logo_url: string | null;
   theme_color: string;
+  primary_color: string | null;
+  secondary_color: string | null;
   gallery_images: string[];
   role: string;
   active: boolean;

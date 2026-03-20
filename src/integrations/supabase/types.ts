@@ -113,7 +113,9 @@ export type Database = {
           linkedin: string | null
           organization_id: string | null
           phone: string | null
+          primary_color: string | null
           role: string | null
+          secondary_color: string | null
           slug: string
           theme_color: string | null
           twitter: string | null
@@ -137,7 +139,9 @@ export type Database = {
           linkedin?: string | null
           organization_id?: string | null
           phone?: string | null
+          primary_color?: string | null
           role?: string | null
+          secondary_color?: string | null
           slug: string
           theme_color?: string | null
           twitter?: string | null
@@ -161,7 +165,9 @@ export type Database = {
           linkedin?: string | null
           organization_id?: string | null
           phone?: string | null
+          primary_color?: string | null
           role?: string | null
+          secondary_color?: string | null
           slug?: string
           theme_color?: string | null
           twitter?: string | null

@@ -1,4 +1,5 @@
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 export const CARD_THEMES: { key: string; label: string; bg: string; text: string; accent: string; gradient?: string }[] = [
@@ -28,20 +29,55 @@ export const CARD_THEMES: { key: string; label: string; bg: string; text: string
   { key: 'blush', label: 'Blush', bg: '#FDF2F8', text: '#831843', accent: '#EC4899', gradient: 'linear-gradient(135deg, #FDF2F8, #FCE7F3)' },
   { key: 'ivory', label: 'Ivory', bg: '#FEFCE8', text: '#3F3F46', accent: '#84CC16', gradient: 'linear-gradient(135deg, #FEFCE8, #ECFCCB)' },
   { key: 'silver', label: 'Silver', bg: '#F4F4F5', text: '#27272A', accent: '#71717A', gradient: 'linear-gradient(135deg, #F4F4F5, #E4E4E7)' },
+  // Custom option
+  { key: 'custom', label: 'Custom', bg: '#FFFFFF', text: '#1A1A1A', accent: '#2563EB' },
 ];
 
-export function getTheme(key: string) {
+export function getTheme(key: string, primaryColor?: string | null, secondaryColor?: string | null) {
+  if (key === 'custom' && primaryColor) {
+    const isLightPrimary = isLightColor(primaryColor);
+    return {
+      key: 'custom',
+      label: 'Custom',
+      bg: secondaryColor || '#FFFFFF',
+      text: isLightPrimary ? '#1A1A1A' : '#FFFFFF',
+      accent: primaryColor,
+      gradient: secondaryColor
+        ? `linear-gradient(135deg, ${secondaryColor}, ${adjustBrightness(secondaryColor, -15)})`
+        : undefined,
+    };
+  }
   return CARD_THEMES.find(t => t.key === key) || CARD_THEMES[0];
+}
+
+function isLightColor(hex: string): boolean {
+  const c = hex.replace('#', '');
+  const r = parseInt(c.substring(0, 2), 16);
+  const g = parseInt(c.substring(2, 4), 16);
+  const b = parseInt(c.substring(4, 6), 16);
+  return (r * 299 + g * 587 + b * 114) / 1000 > 128;
+}
+
+function adjustBrightness(hex: string, percent: number): string {
+  const c = hex.replace('#', '');
+  const r = Math.max(0, Math.min(255, parseInt(c.substring(0, 2), 16) + Math.round(2.55 * percent)));
+  const g = Math.max(0, Math.min(255, parseInt(c.substring(2, 4), 16) + Math.round(2.55 * percent)));
+  const b = Math.max(0, Math.min(255, parseInt(c.substring(4, 6), 16) + Math.round(2.55 * percent)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
 interface ThemePickerProps {
   value: string;
   onChange: (theme: string) => void;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  onPrimaryChange?: (color: string) => void;
+  onSecondaryChange?: (color: string) => void;
 }
 
-export function ThemePicker({ value, onChange }: ThemePickerProps) {
+export function ThemePicker({ value, onChange, primaryColor, secondaryColor, onPrimaryChange, onSecondaryChange }: ThemePickerProps) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <Label className="text-sm font-semibold">Card Theme</Label>
       <div className="grid grid-cols-5 gap-2">
         {CARD_THEMES.map((theme) => (
@@ -55,15 +91,59 @@ export function ThemePicker({ value, onChange }: ThemePickerProps) {
                 : 'border-border hover:border-primary/50'
             )}
             style={{
-              background: theme.gradient || theme.bg,
-              color: theme.text,
+              background: theme.key === 'custom' && primaryColor
+                ? `linear-gradient(135deg, ${primaryColor}, ${secondaryColor || '#FFFFFF'})`
+                : theme.gradient || theme.bg,
+              color: theme.key === 'custom' ? '#1A1A1A' : theme.text,
             }}
           >
-            <div className="w-4 h-4 rounded-full mx-auto mb-1" style={{ background: theme.accent }} />
+            <div
+              className="w-4 h-4 rounded-full mx-auto mb-1"
+              style={{ background: theme.key === 'custom' && primaryColor ? primaryColor : theme.accent }}
+            />
             {theme.label}
           </button>
         ))}
       </div>
+
+      {value === 'custom' && (
+        <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-border bg-card">
+          <div>
+            <Label className="text-xs">Primary Color (accent/brand)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="color"
+                value={primaryColor || '#2563EB'}
+                onChange={e => onPrimaryChange?.(e.target.value)}
+                className="w-8 h-8 rounded cursor-pointer border-0"
+              />
+              <Input
+                value={primaryColor || '#2563EB'}
+                onChange={e => onPrimaryChange?.(e.target.value)}
+                placeholder="#2563EB"
+                className="bg-background text-xs h-8"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs">Secondary Color (background)</Label>
+            <div className="flex items-center gap-2 mt-1">
+              <input
+                type="color"
+                value={secondaryColor || '#FFFFFF'}
+                onChange={e => onSecondaryChange?.(e.target.value)}
+                className="w-8 h-8 rounded cursor-pointer border-0"
+              />
+              <Input
+                value={secondaryColor || '#FFFFFF'}
+                onChange={e => onSecondaryChange?.(e.target.value)}
+                placeholder="#FFFFFF"
+                className="bg-background text-xs h-8"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

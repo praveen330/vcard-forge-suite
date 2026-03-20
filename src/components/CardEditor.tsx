@@ -36,6 +36,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
   const [avatarUrl, setAvatarUrl] = useState<string | null>(card?.avatar_url || null);
   const [companyLogoUrl, setCompanyLogoUrl] = useState<string | null>(card?.company_logo_url || null);
   const [themeColor, setThemeColor] = useState(card?.theme_color || 'dark');
+  const [primaryColor, setPrimaryColor] = useState<string | null>(card?.primary_color || null);
+  const [secondaryColor, setSecondaryColor] = useState<string | null>(card?.secondary_color || null);
   const [galleryImages, setGalleryImages] = useState<string[]>(card?.gallery_images || []);
   const [cardLinks, setCardLinks] = useState<CardLink[]>([]);
   const [saving, setSaving] = useState(false);
@@ -56,6 +58,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
       setAvatarUrl(card.avatar_url || null);
       setCompanyLogoUrl(card.company_logo_url || null);
       setThemeColor(card.theme_color || 'dark');
+      setPrimaryColor(card.primary_color || null);
+      setSecondaryColor(card.secondary_color || null);
       setGalleryImages(card.gallery_images || []);
       loadLinks(card.id);
     }
@@ -146,6 +150,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
         avatar_url: avatarUrl,
         company_logo_url: companyLogoUrl,
         theme_color: themeColor,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
         gallery_images: galleryImages,
         organization_id: organizationId || card?.organization_id || null,
         active: true,
@@ -182,7 +188,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     website: form.website || null, linkedin: form.linkedin || null,
     instagram: form.instagram || null, twitter: form.twitter || null,
     avatar_url: avatarUrl, company_logo_url: companyLogoUrl,
-    theme_color: themeColor, gallery_images: galleryImages,
+    theme_color: themeColor, primary_color: primaryColor, secondary_color: secondaryColor,
+    gallery_images: galleryImages,
     active: true, created_at: '', organization_id: null, role: 'employee',
   };
 
@@ -315,7 +322,14 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
           <hr className="border-border" />
 
           {/* Theme Picker */}
-          <ThemePicker value={themeColor} onChange={setThemeColor} />
+          <ThemePicker
+            value={themeColor}
+            onChange={setThemeColor}
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            onPrimaryChange={setPrimaryColor}
+            onSecondaryChange={setSecondaryColor}
+          />
 
           {/* Links Manager — only if card is saved */}
           {card?.id && (

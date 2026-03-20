@@ -12,21 +12,27 @@ import { toast } from 'sonner';
 import {
   Loader2, ArrowLeft, Trash2, Plus, BarChart3,
   Building2, CreditCard, Megaphone, Upload, Download, ExternalLink, Edit, X,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 const ADMIN_EMAIL = 'gpk330@gmail.com';
-type AdminTab = 'overview' | 'organizations' | 'cards' | 'promos' | 'bulk';
+type AdminTab = 'dashboard' | 'management';
 
 export default function Admin() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [tab, setTab] = useState<AdminTab>('overview');
+  const [tab, setTab] = useState<AdminTab>('dashboard');
   const [cards, setCards] = useState<CardType[]>([]);
   const [scans, setScans] = useState<Scan[]>([]);
   const [promos, setPromos] = useState<Promo[]>([]);
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [imports, setImports] = useState<BulkImport[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Expandable sections
+  const [showOrgForm, setShowOrgForm] = useState(false);
+  const [showPromoSection, setShowPromoSection] = useState(false);
+  const [showBulkSection, setShowBulkSection] = useState(false);
 
   useEffect(() => {
     if (!authLoading && (!user || user.email !== ADMIN_EMAIL)) {
@@ -41,7 +47,6 @@ export default function Admin() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // NEVER query auth.users — use our own tables only
       const [cardsRes, scansRes, promosRes, orgsRes, importsRes] = await Promise.all([
         supabase.from('cards').select('*').order('created_at', { ascending: false }),
         supabase.from('scans').select('*').order('created_at', { ascending: false }),
@@ -57,7 +62,7 @@ export default function Admin() {
     } catch (err: any) {
       toast.error('Failed to load admin data: ' + err.message);
     } finally {
-      setLoading(false); // ALWAYS runs
+      setLoading(false);
     }
   };
 
@@ -82,7 +87,6 @@ export default function Admin() {
 
   const todayScans = scans.filter(s => new Date(s.created_at).toDateString() === new Date().toDateString()).length;
   const activeCards = cards.filter(c => c.active).length;
-  const uniqueUsers = new Set(cards.filter(c => c.user_id).map(c => c.user_id)).size;
 
   // ─── ORG FORM ────────────────────────────────────────────────
   const [orgForm, setOrgForm] = useState({ name: '', owner_email: '', domain: '', max_cards: '10' });
@@ -100,8 +104,9 @@ export default function Admin() {
         active: true,
       });
       if (error) throw error;
-      toast.success('Organization created');
+      toast.success('Organization created — the owner can now log in as client admin');
       setOrgForm({ name: '', owner_email: '', domain: '', max_cards: '10' });
+      setShowOrgForm(false);
       loadData();
     } catch (err: any) { toast.error(err.message); }
   };
@@ -123,6 +128,7 @@ export default function Admin() {
     linkedin: '', instagram: '', twitter: '', website: '',
   });
   const [editingCard, setEditingCard] = useState<string | null>(null);
+  const [showCardForm, setShowCardForm] = useState(false);
 
   const startEditCard = (c: CardType) => {
     setEditingCard(c.id);
@@ -135,11 +141,13 @@ export default function Admin() {
       instagram: c.instagram || '', twitter: c.twitter || '',
       website: c.website || '',
     });
-    setTab('cards');
+    setShowCardForm(true);
+    setTab('dashboard');
   };
 
   const cancelEditCard = () => {
     setEditingCard(null);
+    setShowCardForm(false);
     setCardForm({ full_name: '', slug: '', job_title: '', company: '', email: '', phone: '', whatsapp: '', organization_id: '', bio: '', linkedin: '', instagram: '', twitter: '', website: '' });
   };
 
@@ -249,7 +257,6 @@ export default function Admin() {
     setCsvRows(rows);
     setCsvErrors({});
 
-    // Check slugs against database
     setCheckingSlug(true);
     const slugs = rows.map(r => r.slug).filter(s => s && /^[a-z0-9-]{3,30}$/.test(s));
     const { data: existingSlugs } = await supabase.from('cards').select('slug').in('slug', slugs);
@@ -260,17 +267,17 @@ export default function Admin() {
     rows.forEach((r, i) => {
       if (!r.full_name) errors[i] = 'full_name missing';
       else if (!r.slug) errors[i] = 'slug missing';
-      else if (!/^[a-z0-9-]{3,30}$/.test(r.slug)) errors[i] = 'slug invalid (use lowercase, numbers, hyphens, 3-30 chars)';
+      else if (!/^[a-z0-9-]{3,30}$/.test(r.slug)) errors[i] = 'slug invalid';
       else if (taken.has(r.slug)) errors[i] = 'slug already taken';
     });
     setCsvErrors(errors);
-    toast.success(`Parsed ${rows.length} rows — ${rows.length - Object.keys(errors).length} valid, ${Object.keys(errors).length} invalid`);
+    toast.success(`Parsed ${rows.length} rows — ${rows.length - Object.keys(errors).length} valid`);
   };
 
   const runImport = async () => {
     if (!bulkOrg) { toast.error('Select an organization first'); return; }
     const valid = csvRows.filter((_, i) => !csvErrors[i]);
-    if (valid.length === 0) { toast.error('No valid rows to import'); return; }
+    if (valid.length === 0) { toast.error('No valid rows'); return; }
 
     setImporting(true);
     let successCount = 0;
@@ -293,15 +300,10 @@ export default function Admin() {
         twitter: row.twitter || null,
         active: true,
       });
-      if (error) {
-        errorCount++;
-        errorDetails.push({ slug: row.slug, error: error.message });
-      } else {
-        successCount++;
-      }
+      if (error) { errorCount++; errorDetails.push({ slug: row.slug, error: error.message }); }
+      else { successCount++; }
     }
 
-    // Save import history
     await supabase.from('bulk_imports').insert({
       organization_id: bulkOrg,
       imported_by: user!.id,
@@ -311,8 +313,7 @@ export default function Admin() {
       errors: errorDetails,
     });
 
-    const skipped = Object.keys(csvErrors).length;
-    toast.success(`✓ ${successCount} cards created  ✗ ${errorCount} failed  ⚠ ${skipped} skipped (invalid)`);
+    toast.success(`✓ ${successCount} created  ✗ ${errorCount} failed`);
     setCsvRows([]);
     setCsvErrors({});
     if (fileRef.current) fileRef.current.value = '';
@@ -338,27 +339,20 @@ export default function Admin() {
 
   if (user?.email !== ADMIN_EMAIL) return null;
 
-  const adminTabs: { key: AdminTab; label: string; icon: typeof BarChart3 }[] = [
-    { key: 'overview',      label: 'Overview', icon: BarChart3 },
-    { key: 'organizations', label: 'Orgs',     icon: Building2 },
-    { key: 'cards',         label: 'Cards',    icon: CreditCard },
-    { key: 'promos',        label: 'Promos',   icon: Megaphone },
-    { key: 'bulk',          label: 'Import',   icon: Upload },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border px-4 py-3 flex items-center gap-2">
+      <header className="border-b border-border px-4 py-3 flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')} className="shrink-0">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-lg font-display font-bold shrink-0">
           <span className="gold-text">Admin</span>
-          <span className="text-muted-foreground text-sm font-normal ml-2 hidden sm:inline">{user.email}</span>
         </h1>
-        {/* Scrollable tabs — works on mobile */}
-        <div className="flex gap-1 ml-auto overflow-x-auto scrollbar-hide">
-          {adminTabs.map(t => (
+        <div className="flex gap-1 ml-auto">
+          {[
+            { key: 'dashboard' as AdminTab, label: 'Dashboard', icon: BarChart3 },
+            { key: 'management' as AdminTab, label: 'Management', icon: Building2 },
+          ].map(t => (
             <Button
               key={t.key}
               variant={tab === t.key ? 'gold' : 'ghost'}
@@ -366,8 +360,8 @@ export default function Admin() {
               onClick={() => setTab(t.key)}
               className="shrink-0"
             >
-              <t.icon className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">{t.label}</span>
+              <t.icon className="h-4 w-4 mr-1" />
+              {t.label}
             </Button>
           ))}
         </div>
@@ -375,16 +369,16 @@ export default function Admin() {
 
       <main className="px-4 py-6 max-w-5xl mx-auto space-y-6">
 
-        {/* ── OVERVIEW ─────────────────────────────────────────── */}
-        {tab === 'overview' && (
+        {/* ══════════════════ DASHBOARD TAB ══════════════════ */}
+        {tab === 'dashboard' && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { label: 'Total Cards',   value: cards.length },
-                { label: 'Active Cards',  value: activeCards },
+                { label: 'Total Cards', value: cards.length },
+                { label: 'Active Cards', value: activeCards },
                 { label: 'Organizations', value: orgs.length },
-                { label: 'Scans Today',   value: todayScans },
-                { label: 'Total Scans',   value: scans.length },
+                { label: 'Scans Today', value: todayScans },
               ].map(s => (
                 <div key={s.label} className="glass-card rounded-xl p-4 text-center">
                   <p className="text-2xl font-bold text-primary">{s.value}</p>
@@ -393,192 +387,86 @@ export default function Admin() {
               ))}
             </div>
 
-            <div className="glass-card rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-foreground mb-3">Top 10 Cards by Scans</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-muted-foreground text-xs border-b border-border">
-                      <th className="text-left py-2 pr-2">#</th>
-                      <th className="text-left py-2">Name</th>
-                      <th className="text-left py-2">Slug</th>
-                      <th className="text-left py-2 hidden sm:table-cell">Org</th>
-                      <th className="text-right py-2">Scans</th>
-                      <th className="text-right py-2">Status</th>
-                      <th className="py-2"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cards
-                      .map(c => ({ ...c, scanCount: scans.filter(s => s.card_id === c.id).length }))
-                      .sort((a, b) => b.scanCount - a.scanCount)
-                      .slice(0, 10)
-                      .map((c, i) => (
-                        <tr key={c.id} className="border-b border-border/50 hover:bg-accent/5">
-                          <td className="py-2 pr-2 text-muted-foreground text-xs">{i + 1}</td>
-                          <td className="py-2 text-foreground font-medium">{c.full_name}</td>
-                          <td className="py-2 text-muted-foreground text-xs">/{c.slug}</td>
-                          <td className="py-2 text-muted-foreground text-xs hidden sm:table-cell">
-                            {orgs.find(o => o.id === c.organization_id)?.name || '—'}
-                          </td>
-                          <td className="py-2 text-right text-primary font-semibold">{c.scanCount}</td>
-                          <td className="py-2 text-right">
-                            <span className={c.active ? 'text-green-400 text-xs' : 'text-destructive text-xs'}>
-                              {c.active ? 'Active' : 'Off'}
-                            </span>
-                          </td>
-                          <td className="py-2 text-right">
-                            <a href={`/${c.slug}`} target="_blank" rel="noreferrer">
-                              <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-foreground" />
-                            </a>
-                          </td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
-                {cards.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p>No cards yet</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* ── ORGANIZATIONS ────────────────────────────────────── */}
-        {tab === 'organizations' && (
-          <div className="space-y-6">
-            <div className="glass-card rounded-xl p-4 space-y-3">
-              <h3 className="font-semibold text-foreground">Add Organization</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Name *</Label>
-                  <Input value={orgForm.name} onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))} placeholder="Emirates NBD" className="bg-card" />
-                </div>
-                <div>
-                  <Label>Owner Email *</Label>
-                  <Input type="email" value={orgForm.owner_email} onChange={e => setOrgForm(f => ({ ...f, owner_email: e.target.value }))} placeholder="admin@company.com" className="bg-card" />
-                  <p className="text-xs text-muted-foreground mt-0.5">This person becomes client admin</p>
-                </div>
-                <div>
-                  <Label>Email Domain (auto-assign)</Label>
-                  <Input value={orgForm.domain} onChange={e => setOrgForm(f => ({ ...f, domain: e.target.value }))} placeholder="emiratesnbd.com" className="bg-card" />
-                  <p className="text-xs text-muted-foreground mt-0.5">Users with this domain auto-join</p>
-                </div>
-                <div>
-                  <Label>Max Cards</Label>
-                  <Input type="number" value={orgForm.max_cards} onChange={e => setOrgForm(f => ({ ...f, max_cards: e.target.value }))} className="bg-card" />
-                </div>
-              </div>
-              <Button variant="gold" onClick={saveOrg}><Plus className="mr-1 h-4 w-4" /> Create Organization</Button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-muted-foreground text-xs border-b border-border">
-                    <th className="text-left py-2">Name</th>
-                    <th className="text-left py-2">Owner</th>
-                    <th className="text-left py-2 hidden sm:table-cell">Domain</th>
-                    <th className="text-right py-2">Cards</th>
-                    <th className="text-right py-2">Active</th>
-                    <th className="py-2"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orgs.map(o => (
-                    <tr key={o.id} className="border-b border-border/50">
-                      <td className="py-2 text-foreground font-medium">{o.name}</td>
-                      <td className="py-2 text-muted-foreground text-xs">{o.owner_email}</td>
-                      <td className="py-2 text-muted-foreground hidden sm:table-cell">{o.domain || '—'}</td>
-                      <td className="py-2 text-right">{cards.filter(c => c.organization_id === o.id).length}/{o.max_cards}</td>
-                      <td className="py-2 text-right">
-                        <span className={o.active ? 'text-green-400' : 'text-destructive'}>{o.active ? '✓' : '✗'}</span>
-                      </td>
-                      <td className="py-2 text-right">
-                        <Button variant="ghost" size="icon" onClick={() => deleteOrg(o.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {orgs.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Building2 className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p>No organizations yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ── CARDS ────────────────────────────────────────────── */}
-        {tab === 'cards' && (
-          <div className="space-y-6">
+            {/* Card Form (collapsible) */}
             <div className="glass-card rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-foreground">{editingCard ? 'Edit Card' : 'Add Single Card'}</h3>
-                {editingCard && (
-                  <Button variant="ghost" size="sm" onClick={cancelEditCard}>
-                    <X className="mr-1 h-4 w-4" /> Cancel
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  {editingCard ? 'Edit Card' : 'Add New Card'}
+                </h3>
+                <div className="flex gap-2">
+                  {editingCard && (
+                    <Button variant="ghost" size="sm" onClick={cancelEditCard}>
+                      <X className="mr-1 h-4 w-4" /> Cancel
+                    </Button>
+                  )}
+                  {!editingCard && (
+                    <Button variant="ghost" size="sm" onClick={() => setShowCardForm(!showCardForm)}>
+                      {showCardForm ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {(showCardForm || editingCard) && (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Full Name *</Label>
+                      <Input
+                        value={cardForm.full_name}
+                        onChange={e => setCardForm(f => ({
+                          ...f,
+                          full_name: e.target.value,
+                          slug: editingCard ? f.slug : e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
+                        }))}
+                        className="bg-card"
+                      />
+                    </div>
+                    <div>
+                      <Label>Slug *</Label>
+                      <Input value={cardForm.slug} onChange={e => setCardForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))} className="bg-card" />
+                    </div>
+                    <div><Label>Job Title</Label><Input value={cardForm.job_title} onChange={e => setCardForm(f => ({ ...f, job_title: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Company</Label><Input value={cardForm.company} onChange={e => setCardForm(f => ({ ...f, company: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Email</Label><Input type="email" value={cardForm.email} onChange={e => setCardForm(f => ({ ...f, email: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Phone</Label><Input value={cardForm.phone} onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>WhatsApp</Label><Input value={cardForm.whatsapp} onChange={e => setCardForm(f => ({ ...f, whatsapp: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Website</Label><Input value={cardForm.website} onChange={e => setCardForm(f => ({ ...f, website: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>LinkedIn</Label><Input value={cardForm.linkedin} onChange={e => setCardForm(f => ({ ...f, linkedin: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Instagram</Label><Input value={cardForm.instagram} onChange={e => setCardForm(f => ({ ...f, instagram: e.target.value }))} className="bg-card" /></div>
+                    <div><Label>Twitter/X</Label><Input value={cardForm.twitter} onChange={e => setCardForm(f => ({ ...f, twitter: e.target.value }))} className="bg-card" /></div>
+                    <div>
+                      <Label>Organization</Label>
+                      <select className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+                        value={cardForm.organization_id} onChange={e => setCardForm(f => ({ ...f, organization_id: e.target.value }))}>
+                        <option value="">None</option>
+                        {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Bio</Label>
+                    <Textarea value={cardForm.bio} onChange={e => setCardForm(f => ({ ...f, bio: e.target.value }))} className="bg-card" rows={2} />
+                  </div>
+                  <Button variant="gold" onClick={addCard}>
+                    <Plus className="mr-1 h-4 w-4" /> {editingCard ? 'Update Card' : 'Create Card'}
                   </Button>
-                )}
-              </div>
-              {!editingCard && <p className="text-xs text-muted-foreground">Leave user_id empty — employee claims the card by logging in with their email.</p>}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Full Name *</Label>
-                  <Input
-                    value={cardForm.full_name}
-                    onChange={e => setCardForm(f => ({
-                      ...f,
-                      full_name: e.target.value,
-                      slug: editingCard ? f.slug : e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30)
-                    }))}
-                    className="bg-card"
-                  />
-                </div>
-                <div>
-                  <Label>Slug *</Label>
-                  <Input value={cardForm.slug} onChange={e => setCardForm(f => ({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') }))} className="bg-card" />
-                </div>
-                <div><Label>Job Title</Label><Input value={cardForm.job_title} onChange={e => setCardForm(f => ({ ...f, job_title: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Company</Label><Input value={cardForm.company} onChange={e => setCardForm(f => ({ ...f, company: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Email</Label><Input type="email" value={cardForm.email} onChange={e => setCardForm(f => ({ ...f, email: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Phone</Label><Input value={cardForm.phone} onChange={e => setCardForm(f => ({ ...f, phone: e.target.value }))} className="bg-card" /></div>
-                <div><Label>WhatsApp</Label><Input value={cardForm.whatsapp} onChange={e => setCardForm(f => ({ ...f, whatsapp: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Website</Label><Input value={cardForm.website} onChange={e => setCardForm(f => ({ ...f, website: e.target.value }))} className="bg-card" /></div>
-                <div><Label>LinkedIn</Label><Input value={cardForm.linkedin} onChange={e => setCardForm(f => ({ ...f, linkedin: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Instagram</Label><Input value={cardForm.instagram} onChange={e => setCardForm(f => ({ ...f, instagram: e.target.value }))} className="bg-card" /></div>
-                <div><Label>Twitter/X</Label><Input value={cardForm.twitter} onChange={e => setCardForm(f => ({ ...f, twitter: e.target.value }))} className="bg-card" /></div>
-                <div>
-                  <Label>Organization</Label>
-                  <select className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
-                    value={cardForm.organization_id} onChange={e => setCardForm(f => ({ ...f, organization_id: e.target.value }))}>
-                    <option value="">None</option>
-                    {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div>
-                <Label>Bio</Label>
-                <Textarea value={cardForm.bio} onChange={e => setCardForm(f => ({ ...f, bio: e.target.value }))} className="bg-card" rows={2} />
-              </div>
-              <Button variant="gold" onClick={addCard}>
-                <Plus className="mr-1 h-4 w-4" /> {editingCard ? 'Update Card' : 'Create Card'}
-              </Button>
+                </>
+              )}
             </div>
 
-            <div>
-              <select className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground mb-3"
-                value={cardOrgFilter} onChange={e => setCardOrgFilter(e.target.value)}>
-                <option value="">All Organizations ({cards.length})</option>
-                {orgs.map(o => <option key={o.id} value={o.id}>{o.name} ({cards.filter(c => c.organization_id === o.id).length})</option>)}
-              </select>
+            {/* Cards Table */}
+            <div className="glass-card rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" /> All Cards ({filteredCards.length})
+                </h3>
+                <select className="h-8 rounded-lg border border-border bg-card px-2 text-xs text-foreground"
+                  value={cardOrgFilter} onChange={e => setCardOrgFilter(e.target.value)}>
+                  <option value="">All Orgs</option>
+                  {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -607,7 +495,7 @@ export default function Admin() {
                           <a href={`/${c.slug}`} target="_blank" rel="noreferrer">
                             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
                           </a>
-                          <Button variant="ghost" size="icon" onClick={() => startEditCard(c)} title="Edit card">
+                          <Button variant="ghost" size="icon" onClick={() => startEditCard(c)} title="Edit">
                             <Edit className="h-4 w-4 text-primary" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => deleteCard(c.id)}>
@@ -621,206 +509,223 @@ export default function Admin() {
                 {filteredCards.length === 0 && (
                   <div className="text-center py-8 text-muted-foreground">
                     <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p>No cards {cardOrgFilter ? 'in this organization' : 'yet'}</p>
+                    <p>No cards yet</p>
                   </div>
                 )}
               </div>
             </div>
-          </div>
+          </>
         )}
 
-        {/* ── PROMOS ───────────────────────────────────────────── */}
-        {tab === 'promos' && (
-          <div className="space-y-6">
-            <div className="glass-card rounded-xl p-4 space-y-4">
-              <h3 className="font-semibold text-foreground">{editingPromo ? 'Edit Promo' : 'New Promo'}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <Label>Assign to Card *</Label>
-                  <select className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
-                    value={promoForm.card_id} onChange={e => setPromoForm(p => ({ ...p, card_id: e.target.value }))}>
-                    <option value="">Select card...</option>
-                    {cards.map(c => <option key={c.id} value={c.id}>{c.full_name} (/{c.slug})</option>)}
-                  </select>
-                </div>
-                <div><Label>Title *</Label><Input value={promoForm.title} onChange={e => setPromoForm(p => ({ ...p, title: e.target.value }))} className="bg-card" /></div>
-              </div>
-              <div><Label>Description</Label><Textarea value={promoForm.description} onChange={e => setPromoForm(p => ({ ...p, description: e.target.value }))} className="bg-card" rows={2} /></div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><Label>CTA Text</Label><Input value={promoForm.cta_text} onChange={e => setPromoForm(p => ({ ...p, cta_text: e.target.value }))} placeholder="Learn More" className="bg-card" /></div>
-                <div><Label>CTA URL</Label><Input value={promoForm.cta_url} onChange={e => setPromoForm(p => ({ ...p, cta_url: e.target.value }))} placeholder="https://..." className="bg-card" /></div>
-                <div><Label>Image URL</Label><Input value={promoForm.image_url} onChange={e => setPromoForm(p => ({ ...p, image_url: e.target.value }))} placeholder="https://..." className="bg-card" /></div>
-                <div><Label>Expires At</Label><Input type="datetime-local" value={promoForm.expires_at} onChange={e => setPromoForm(p => ({ ...p, expires_at: e.target.value }))} className="bg-card" /></div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={promoForm.active} onCheckedChange={v => setPromoForm(p => ({ ...p, active: v }))} />
-                <Label>Active</Label>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="gold" onClick={savePromo}>
-                  <Plus className="mr-1 h-4 w-4" />{editingPromo ? 'Update' : 'Create'} Promo
+        {/* ══════════════════ MANAGEMENT TAB ══════════════════ */}
+        {tab === 'management' && (
+          <div className="space-y-4">
+
+            {/* ── ORGANIZATIONS ── */}
+            <div className="glass-card rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Building2 className="h-4 w-4" /> Organizations ({orgs.length})
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowOrgForm(!showOrgForm)}>
+                  {showOrgForm ? <ChevronUp className="h-4 w-4" /> : <><Plus className="h-4 w-4 mr-1" /> Add</>}
                 </Button>
-                {editingPromo && (
-                  <Button variant="ghost" onClick={() => { setEditingPromo(null); setPromoForm({ ...emptyPromo }); }}>Cancel</Button>
-                )}
+              </div>
+
+              {showOrgForm && (
+                <div className="border border-border rounded-lg p-3 space-y-3 bg-card">
+                  <p className="text-xs text-muted-foreground">The owner email becomes the client admin — they can log in and manage their org's cards.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><Label>Name *</Label><Input value={orgForm.name} onChange={e => setOrgForm(f => ({ ...f, name: e.target.value }))} placeholder="Acme Corp" className="bg-background" /></div>
+                    <div><Label>Owner Email *</Label><Input type="email" value={orgForm.owner_email} onChange={e => setOrgForm(f => ({ ...f, owner_email: e.target.value }))} placeholder="admin@company.com" className="bg-background" /></div>
+                    <div><Label>Email Domain</Label><Input value={orgForm.domain} onChange={e => setOrgForm(f => ({ ...f, domain: e.target.value }))} placeholder="company.com" className="bg-background" /></div>
+                    <div><Label>Max Cards</Label><Input type="number" value={orgForm.max_cards} onChange={e => setOrgForm(f => ({ ...f, max_cards: e.target.value }))} className="bg-background" /></div>
+                  </div>
+                  <Button variant="gold" size="sm" onClick={saveOrg}><Plus className="mr-1 h-4 w-4" /> Create Organization</Button>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-muted-foreground text-xs border-b border-border">
+                      <th className="text-left py-2">Name</th>
+                      <th className="text-left py-2">Admin Email</th>
+                      <th className="text-right py-2">Cards</th>
+                      <th className="text-right py-2">Active</th>
+                      <th className="py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {orgs.map(o => (
+                      <tr key={o.id} className="border-b border-border/50">
+                        <td className="py-2 text-foreground font-medium">{o.name}</td>
+                        <td className="py-2 text-muted-foreground text-xs">{o.owner_email}</td>
+                        <td className="py-2 text-right">{cards.filter(c => c.organization_id === o.id).length}/{o.max_cards}</td>
+                        <td className="py-2 text-right">
+                          <span className={o.active ? 'text-green-400' : 'text-destructive'}>{o.active ? '✓' : '✗'}</span>
+                        </td>
+                        <td className="py-2 text-right">
+                          <Button variant="ghost" size="icon" onClick={() => deleteOrg(o.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {orgs.length === 0 && <p className="text-center py-4 text-muted-foreground text-sm">No organizations yet</p>}
               </div>
             </div>
 
-            <div className="space-y-3">
-              {promos.map(p => (
-                <div key={p.id} className="glass-card rounded-xl p-4 flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-foreground truncate">{p.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Card: {cards.find(c => c.id === p.card_id)?.slug || '—'} · {p.active ? 'Active' : 'Inactive'}
-                      {p.expires_at && ` · expires ${new Date(p.expires_at).toLocaleDateString()}`}
-                    </p>
+            {/* ── PROMOS ── */}
+            <div className="glass-card rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Megaphone className="h-4 w-4" /> Promos ({promos.length})
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowPromoSection(!showPromoSection)}>
+                  {showPromoSection ? <ChevronUp className="h-4 w-4" /> : <><Plus className="h-4 w-4 mr-1" /> Add</>}
+                </Button>
+              </div>
+
+              {showPromoSection && (
+                <div className="border border-border rounded-lg p-3 space-y-3 bg-card">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label>Card *</Label>
+                      <select className="w-full h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                        value={promoForm.card_id} onChange={e => setPromoForm(p => ({ ...p, card_id: e.target.value }))}>
+                        <option value="">Select card...</option>
+                        {cards.map(c => <option key={c.id} value={c.id}>{c.full_name} (/{c.slug})</option>)}
+                      </select>
+                    </div>
+                    <div><Label>Title *</Label><Input value={promoForm.title} onChange={e => setPromoForm(p => ({ ...p, title: e.target.value }))} className="bg-background" /></div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <Button variant="ghost" size="sm" onClick={() => {
-                      setEditingPromo(p.id);
-                      setPromoForm({ card_id: p.card_id, title: p.title, description: p.description || '', cta_text: p.cta_text || '', cta_url: p.cta_url || '', image_url: p.image_url || '', active: p.active, expires_at: p.expires_at || '' });
-                    }}>Edit</Button>
-                    <Button variant="ghost" size="icon" onClick={() => deletePromo(p.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                  <div><Label>Description</Label><Textarea value={promoForm.description} onChange={e => setPromoForm(p => ({ ...p, description: e.target.value }))} className="bg-background" rows={2} /></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div><Label>CTA Text</Label><Input value={promoForm.cta_text} onChange={e => setPromoForm(p => ({ ...p, cta_text: e.target.value }))} className="bg-background" /></div>
+                    <div><Label>CTA URL</Label><Input value={promoForm.cta_url} onChange={e => setPromoForm(p => ({ ...p, cta_url: e.target.value }))} className="bg-background" /></div>
+                    <div><Label>Image URL</Label><Input value={promoForm.image_url} onChange={e => setPromoForm(p => ({ ...p, image_url: e.target.value }))} className="bg-background" /></div>
+                    <div><Label>Expires</Label><Input type="datetime-local" value={promoForm.expires_at} onChange={e => setPromoForm(p => ({ ...p, expires_at: e.target.value }))} className="bg-background" /></div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="gold" size="sm" onClick={savePromo}>
+                      <Plus className="mr-1 h-4 w-4" />{editingPromo ? 'Update' : 'Create'} Promo
+                    </Button>
+                    {editingPromo && <Button variant="ghost" size="sm" onClick={() => { setEditingPromo(null); setPromoForm({ ...emptyPromo }); }}>Cancel</Button>}
+                  </div>
+                </div>
+              )}
+
+              {promos.length > 0 && (
+                <div className="space-y-2">
+                  {promos.map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-3 p-2 rounded-lg border border-border/50">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">{p.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {cards.find(c => c.id === p.card_id)?.slug || '—'} · {p.active ? 'Active' : 'Off'}
+                        </p>
+                      </div>
+                      <div className="flex gap-1 shrink-0">
+                        <Button variant="ghost" size="sm" onClick={() => {
+                          setEditingPromo(p.id);
+                          setPromoForm({ card_id: p.card_id, title: p.title, description: p.description || '', cta_text: p.cta_text || '', cta_url: p.cta_url || '', image_url: p.image_url || '', active: p.active, expires_at: p.expires_at || '' });
+                          setShowPromoSection(true);
+                        }}>
+                          <Edit className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deletePromo(p.id)}>
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── BULK IMPORT ── */}
+            <div className="glass-card rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <Upload className="h-4 w-4" /> Bulk Import
+                </h3>
+                <Button variant="ghost" size="sm" onClick={() => setShowBulkSection(!showBulkSection)}>
+                  {showBulkSection ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
+
+              {showBulkSection && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={downloadTemplate}>
+                      <Download className="mr-1 h-4 w-4" /> Template
+                    </Button>
+                    <select className="h-9 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
+                      value={bulkOrg} onChange={e => setBulkOrg(e.target.value)}>
+                      <option value="">Select org...</option>
+                      {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                    <input ref={fileRef} type="file" accept=".csv" onChange={handleCSV} className="hidden" />
+                    <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                      <Upload className="mr-1 h-4 w-4" /> Upload CSV
                     </Button>
                   </div>
-                </div>
-              ))}
-              {promos.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Megaphone className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                  <p>No promos yet</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+                  {checkingSlug && <p className="text-xs text-muted-foreground">Checking slugs...</p>}
 
-        {/* ── BULK IMPORT ──────────────────────────────────────── */}
-        {tab === 'bulk' && (
-          <div className="space-y-6">
-            <div className="glass-card rounded-xl p-4 space-y-4">
-              <h3 className="font-semibold text-foreground">Bulk Import Employees</h3>
-              <p className="text-sm text-muted-foreground">
-                Upload a CSV to create multiple cards at once. Employees log in with their email to claim their card.
-              </p>
-
-              {/* Step 1 */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-foreground uppercase tracking-wide">Step 1 — Download Template</p>
-                <Button variant="outline" size="sm" onClick={downloadTemplate}>
-                  <Download className="mr-1 h-4 w-4" /> Download CSV Template
-                </Button>
-              </div>
-
-              {/* Step 2 */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-foreground uppercase tracking-wide">Step 2 — Select Organization *</p>
-                <select
-                  className="w-full h-10 rounded-lg border border-border bg-card px-3 text-sm text-foreground"
-                  value={bulkOrg}
-                  onChange={e => setBulkOrg(e.target.value)}
-                >
-                  <option value="">Select organization...</option>
-                  {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-                </select>
-                {orgs.length === 0 && <p className="text-xs text-destructive">Create an organization first (Orgs tab)</p>}
-              </div>
-
-              {/* Step 3 */}
-              <div className="space-y-2">
-                <p className="text-xs font-medium text-foreground uppercase tracking-wide">Step 3 — Upload CSV</p>
-                <input ref={fileRef} type="file" accept=".csv" onChange={handleCSV} className="hidden" />
-                <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  <Upload className="mr-1 h-4 w-4" /> Choose CSV File
-                </Button>
-                {checkingSlug && <p className="text-xs text-muted-foreground">Checking slugs against database...</p>}
-              </div>
-
-              {/* Step 4 — Preview */}
-              {csvRows.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium text-foreground uppercase tracking-wide">Step 4 — Preview</p>
-                    <div className="flex gap-3 text-xs">
-                      <span className="text-green-400">{csvRows.filter((_, i) => !csvErrors[i]).length} valid</span>
-                      <span className="text-destructive">{Object.keys(csvErrors).length} invalid</span>
+                  {csvRows.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-green-400">{csvRows.filter((_, i) => !csvErrors[i]).length} valid</span>
+                        <span className="text-destructive">{Object.keys(csvErrors).length} invalid</span>
+                      </div>
+                      <div className="overflow-x-auto max-h-48 overflow-y-auto border border-border rounded-lg">
+                        <table className="w-full text-xs">
+                          <thead className="sticky top-0 bg-card">
+                            <tr className="text-muted-foreground border-b border-border">
+                              <th className="py-1.5 px-2 text-left">#</th>
+                              <th className="py-1.5 px-2 text-left">Name</th>
+                              <th className="py-1.5 px-2 text-left">Slug</th>
+                              <th className="py-1.5 px-2 text-left">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {csvRows.map((r, i) => (
+                              <tr key={i} className={csvErrors[i] ? 'bg-destructive/10' : 'bg-green-500/5'}>
+                                <td className="py-1 px-2">{i + 1}</td>
+                                <td className="py-1 px-2">{r.full_name || '—'}</td>
+                                <td className="py-1 px-2 font-mono">{r.slug || '—'}</td>
+                                <td className="py-1 px-2">{csvErrors[i] ? <span className="text-destructive">✗ {csvErrors[i]}</span> : <span className="text-green-400">✓</span>}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <Button variant="gold" size="sm" onClick={runImport} disabled={importing || !bulkOrg}>
+                        {importing ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Importing...</> : <><Upload className="mr-1 h-4 w-4" /> Import {csvRows.filter((_, i) => !csvErrors[i]).length} Cards</>}
+                      </Button>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="overflow-x-auto max-h-64 overflow-y-auto border border-border rounded-lg">
-                    <table className="w-full text-xs">
-                      <thead className="sticky top-0 bg-card">
-                        <tr className="text-muted-foreground border-b border-border">
-                          <th className="py-2 px-2 text-left">#</th>
-                          <th className="py-2 px-2 text-left">Name</th>
-                          <th className="py-2 px-2 text-left">Slug</th>
-                          <th className="py-2 px-2 text-left">Email</th>
-                          <th className="py-2 px-2 text-left">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {csvRows.map((r, i) => (
-                          <tr key={i} className={csvErrors[i] ? 'bg-destructive/10' : 'bg-green-500/5'}>
-                            <td className="py-1.5 px-2 text-muted-foreground">{i + 1}</td>
-                            <td className="py-1.5 px-2">{r.full_name || '—'}</td>
-                            <td className="py-1.5 px-2 font-mono">{r.slug || '—'}</td>
-                            <td className="py-1.5 px-2 text-muted-foreground">{r.email || '—'}</td>
-                            <td className="py-1.5 px-2">
-                              {csvErrors[i]
-                                ? <span className="text-destructive">✗ {csvErrors[i]}</span>
-                                : <span className="text-green-400">✓ Valid</span>}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <Button
-                    variant="gold"
-                    onClick={runImport}
-                    disabled={importing || !bulkOrg || csvRows.filter((_, i) => !csvErrors[i]).length === 0}
-                  >
-                    {importing
-                      ? <><Loader2 className="mr-1 h-4 w-4 animate-spin" /> Importing...</>
-                      : <><Upload className="mr-1 h-4 w-4" /> Import {csvRows.filter((_, i) => !csvErrors[i]).length} Valid Cards</>}
-                  </Button>
+                  {imports.length > 0 && (
+                    <div className="border-t border-border pt-3">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">Import History</p>
+                      {imports.map(imp => (
+                        <div key={imp.id} className="text-xs text-muted-foreground flex gap-3">
+                          <span>{new Date(imp.created_at).toLocaleDateString()}</span>
+                          <span>{orgs.find(o => o.id === imp.organization_id)?.name || '—'}</span>
+                          <span className="text-green-400">{imp.success_count}✓</span>
+                          <span className="text-destructive">{imp.error_count}✗</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* Import History */}
-            {imports.length > 0 && (
-              <div className="glass-card rounded-xl p-4">
-                <h3 className="text-sm font-semibold text-foreground mb-3">Import History</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-muted-foreground text-xs border-b border-border">
-                        <th className="text-left py-2">Date</th>
-                        <th className="text-left py-2">Organization</th>
-                        <th className="text-right py-2">Total</th>
-                        <th className="text-right py-2">Success</th>
-                        <th className="text-right py-2">Failed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {imports.map(imp => (
-                        <tr key={imp.id} className="border-b border-border/50">
-                          <td className="py-2 text-foreground">{new Date(imp.created_at).toLocaleDateString()}</td>
-                          <td className="py-2 text-muted-foreground">{orgs.find(o => o.id === imp.organization_id)?.name || '—'}</td>
-                          <td className="py-2 text-right">{imp.total_rows}</td>
-                          <td className="py-2 text-right text-green-400 font-medium">{imp.success_count}</td>
-                          <td className="py-2 text-right text-destructive font-medium">{imp.error_count}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         )}
 
