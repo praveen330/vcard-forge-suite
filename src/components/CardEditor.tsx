@@ -58,6 +58,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
       setAvatarUrl(card.avatar_url || null);
       setCompanyLogoUrl(card.company_logo_url || null);
       setThemeColor(card.theme_color || 'dark');
+      setPrimaryColor(card.primary_color || null);
+      setSecondaryColor(card.secondary_color || null);
       setGalleryImages(card.gallery_images || []);
       loadLinks(card.id);
     }
