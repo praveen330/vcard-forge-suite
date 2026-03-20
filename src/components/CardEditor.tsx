@@ -322,7 +322,14 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
           <hr className="border-border" />
 
           {/* Theme Picker */}
-          <ThemePicker value={themeColor} onChange={setThemeColor} />
+          <ThemePicker
+            value={themeColor}
+            onChange={setThemeColor}
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            onPrimaryChange={setPrimaryColor}
+            onSecondaryChange={setSecondaryColor}
+          />
 
           {/* Links Manager — only if card is saved */}
           {card?.id && (
