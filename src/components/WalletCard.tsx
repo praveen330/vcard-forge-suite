@@ -13,7 +13,7 @@ interface WalletCardProps {
 export function WalletCard({ card, appUrl }: WalletCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const publicUrl = `${appUrl}/${card.slug}`;
-  const theme = getTheme(card.theme_color || 'dark');
+  const theme = getTheme(card.theme_color || 'dark', card.primary_color, card.secondary_color);
 
   const downloadAsImage = async () => {
     const { default: html2canvas } = await import('html2canvas');
