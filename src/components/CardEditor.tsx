@@ -188,7 +188,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
     website: form.website || null, linkedin: form.linkedin || null,
     instagram: form.instagram || null, twitter: form.twitter || null,
     avatar_url: avatarUrl, company_logo_url: companyLogoUrl,
-    theme_color: themeColor, gallery_images: galleryImages,
+    theme_color: themeColor, primary_color: primaryColor, secondary_color: secondaryColor,
+    gallery_images: galleryImages,
     active: true, created_at: '', organization_id: null, role: 'employee',
   };
 
