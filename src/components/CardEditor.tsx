@@ -150,6 +150,8 @@ export function CardEditor({ userId, card, onSave, organizationId }: CardEditorP
         avatar_url: avatarUrl,
         company_logo_url: companyLogoUrl,
         theme_color: themeColor,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
         gallery_images: galleryImages,
         organization_id: organizationId || card?.organization_id || null,
         active: true,
