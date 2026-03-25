@@ -2,10 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function Auth() {
@@ -71,63 +69,124 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-sm space-y-8 animate-fade-in">
-        <div className="text-center">
-          <h1 className="text-2xl font-display font-bold mb-2">
-            <span className="gold-text">VCARD</span><span className="text-foreground">·OS</span>
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {otpSent ? 'Enter the code sent to your email' : 'Sign in with your email'}
-          </p>
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center relative overflow-hidden px-4">
+      {/* Ambient background */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none"></div>
+
+      <div className="w-full max-w-md z-10 animate-fade-in">
+        {/* Brand */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl md:text-4xl font-headline font-bold tracking-tighter text-primary mb-2">vCard-OS</h1>
+          <p className="text-muted-foreground font-label text-sm tracking-[0.2em] uppercase">The Digital Curator</p>
         </div>
 
-        {!otpSent ? (
-          <form onSubmit={handleSendOTP} className="space-y-4">
-            <Input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="bg-card h-12 text-center"
-              autoFocus
-            />
-            <Button variant="gold" size="full" type="submit" disabled={loading}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Sending...</> : 'Send Code'}
-            </Button>
-          </form>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex justify-center">
-              <InputOTP maxLength={6} value={otp} onChange={handleOtpChange}>
-                <InputOTPGroup>
-                  {[0, 1, 2, 3, 4, 5].map(i => (
-                    <InputOTPSlot key={i} index={i} className="bg-card border-border" />
-                  ))}
-                </InputOTPGroup>
-              </InputOTP>
+        {/* Login Card */}
+        <div className="glass-panel border border-border/15 rounded-xl p-8 md:p-10 editorial-shadow specular-highlight">
+          {/* Security Badge */}
+          <div className="flex justify-center mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent border border-border/30">
+              <Shield className="w-3.5 h-3.5 text-primary" />
+              <span className="text-[10px] font-label font-medium tracking-widest text-muted-foreground uppercase">Secured Access</span>
             </div>
-            <Button variant="gold" size="full" onClick={() => handleVerify()} disabled={loading || otp.length !== 6}>
-              {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verifying...</> : 'Verify'}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full"
-              onClick={() => handleSendOTP()}
-              disabled={cooldown > 0 || loading}
-            >
-              {cooldown > 0 ? `Resend Code (${cooldown}s)` : 'Resend Code'}
-            </Button>
-            <Button variant="ghost" size="sm" className="w-full" onClick={() => { setOtpSent(false); setOtp(''); setCooldown(0); }}>
-              <ArrowLeft className="mr-1 h-4 w-4" /> Change email
-            </Button>
           </div>
-        )}
 
-        <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => navigate('/')}>
-          ← Back to home
-        </Button>
+          <div className="mb-8 text-center">
+            <h2 className="text-xl md:text-2xl font-headline mb-2">
+              {otpSent ? 'Verify Identity' : 'Secure Access'}
+            </h2>
+            <p className="text-muted-foreground text-sm">
+              {otpSent ? 'Enter the code sent to your email' : 'Verify your identity to enter the vault.'}
+            </p>
+          </div>
+
+          {!otpSent ? (
+            <form onSubmit={handleSendOTP} className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-label font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                  Vault Identifier
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="curator@vcard-os.com"
+                  className="w-full bg-transparent border-b border-border/40 py-3 text-foreground placeholder:text-muted-foreground/40 focus:border-primary focus:outline-none transition-all font-label"
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 editorial-gradient text-primary-foreground font-bold tracking-tight rounded-lg shadow-[0_10px_30px_hsl(42_88%_63%/0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</> : 'Send Access Code'}
+              </button>
+            </form>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-[10px] font-label font-bold uppercase tracking-widest text-primary">
+                    Authentication Code
+                  </label>
+                  <span className="text-[10px] text-muted-foreground">Step 2 of 2</span>
+                </div>
+                <div className="flex justify-center">
+                  <InputOTP maxLength={6} value={otp} onChange={handleOtpChange}>
+                    <InputOTPGroup>
+                      {[0, 1, 2, 3, 4, 5].map(i => (
+                        <InputOTPSlot
+                          key={i}
+                          index={i}
+                          className="bg-accent border-border/30 text-foreground font-headline text-lg w-11 h-13"
+                        />
+                      ))}
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </div>
+
+              <button
+                onClick={() => handleVerify()}
+                disabled={loading || otp.length !== 6}
+                className="w-full py-4 editorial-gradient text-primary-foreground font-bold tracking-tight rounded-lg shadow-[0_10px_30px_hsl(42_88%_63%/0.2)] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> Verifying...</> : 'Secure Login'}
+              </button>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleSendOTP()}
+                  disabled={cooldown > 0 || loading}
+                  className="flex-1 py-2.5 text-sm text-muted-foreground hover:text-primary border border-border/20 rounded-lg transition-all disabled:opacity-40"
+                >
+                  {cooldown > 0 ? `Resend (${cooldown}s)` : 'Resend Code'}
+                </button>
+                <button
+                  onClick={() => { setOtpSent(false); setOtp(''); setCooldown(0); }}
+                  className="flex-1 py-2.5 text-sm text-muted-foreground hover:text-primary border border-border/20 rounded-lg transition-all flex items-center justify-center gap-1"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" /> Change Email
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer links */}
+        <div className="mt-8 text-center space-y-3">
+          <button onClick={() => navigate('/')} className="text-xs text-muted-foreground hover:text-primary transition-colors tracking-wide">
+            ← Back to home
+          </button>
+        </div>
+      </div>
+
+      {/* Bottom branding */}
+      <div className="absolute bottom-6 text-center">
+        <p className="text-[10px] text-muted-foreground/40 tracking-[0.3em] uppercase">
+          Authority of vCard-OS Global Ecosystem
+        </p>
       </div>
     </div>
   );
